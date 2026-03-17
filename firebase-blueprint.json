@@ -1,0 +1,47 @@
+{
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "description": "Employee data for attendance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "employeeId": { "type": "string", "description": "Unique ID for barcode" },
+        "department": { "type": "string" },
+        "position": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "employeeId"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Attendance record for an employee",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "type": { "type": "string", "enum": ["in", "out"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "date": { "type": "string", "description": "YYYY-MM-DD" }
+      },
+      "required": ["employeeId", "type", "timestamp", "date"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "App configuration",
+      "type": "object",
+      "properties": {
+        "workStartTime": { "type": "string", "description": "HH:mm" },
+        "workEndTime": { "type": "string", "description": "HH:mm" },
+        "lateThreshold": { "type": "integer", "description": "Minutes after start time to be considered late" }
+      }
+    }
+  },
+  "firestore": {
+    "/employees": { "schema": "Employee", "description": "Collection of employees" },
+    "/attendance": { "schema": "Attendance", "description": "Collection of attendance records" },
+    "/settings": { "schema": "Setting", "description": "App settings" }
+  }
+}

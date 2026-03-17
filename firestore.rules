@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: employees
+    // Fields:
+    //   - name: string (required)
+    //   - employeeId: string (required, unique)
+    //   - department: string
+    //   - position: string
+    //   - createdAt: timestamp
+    //
+    // Collection: attendance
+    // Fields:
+    //   - employeeId: string (required)
+    //   - employeeName: string
+    //   - type: string (in/out)
+    //   - timestamp: timestamp
+    //   - date: string (YYYY-MM-DD)
+    //
+    // Collection: settings
+    // Fields:
+    //   - workStartTime: string (HH:mm)
+    //   - workEndTime: string (HH:mm)
+    //   - lateThreshold: number
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "noviharyanto062@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmployee(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.employeeId is string && data.employeeId.size() > 0 && data.employeeId.size() < 50;
+    }
+
+    function isValidAttendance(data) {
+      return data.employeeId is string && data.employeeId.size() > 0 &&
+             data.type in ['in', 'out'] &&
+             data.timestamp is timestamp &&
+             data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    function isValidSetting(data) {
+      return data.workStartTime is string && data.workStartTime.matches("^\\d{2}:\\d{2}$") &&
+             data.workEndTime is string && data.workEndTime.matches("^\\d{2}:\\d{2}$") &&
+             data.lateThreshold is number;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /employees/{employeeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidAttendance(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
