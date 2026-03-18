@@ -47,8 +47,19 @@ export default function App() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
+      let message = 'Gagal masuk dengan Google.';
+      
+      if (error.code === 'auth/unauthorized-domain') {
+        message = 'Domain ini belum terdaftar di Firebase. Silakan tambahkan domain Vercel Anda di Firebase Console (Authentication > Settings > Authorized Domains).';
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        message = 'Jendela login ditutup sebelum selesai.';
+      } else if (error.code === 'auth/operation-not-allowed') {
+        message = 'Metode login Google belum diaktifkan di Firebase Console.';
+      }
+      
+      alert(message);
     }
   };
 
