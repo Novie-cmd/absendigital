@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { LogIn, LogOut, LayoutDashboard, Users, Settings as SettingsIcon, FileText, ScanLine } from 'lucide-react';
+import { LogIn, LogOut, LayoutDashboard, Users, Settings as SettingsIcon, FileText, ScanLine, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Scanner from './components/Scanner';
 import AdminPortal from './components/AdminPortal';
@@ -30,7 +30,8 @@ export default function App() {
       try {
         // Cek apakah user adalah admin
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-        const isAdminEmail = currentUser.email === 'noviharyanto062@gmail.com';
+        // Gunakan email dari context user
+        const isAdminEmail = currentUser.email?.toLowerCase() === 'noviharyanto062@gmail.com';
         
         if (isAdminEmail || (userDoc.exists() && userDoc.data().role === 'admin')) {
           setIsAdmin(true);
@@ -146,8 +147,8 @@ export default function App() {
                     view === 'admin' ? 'bg-white text-emerald-600 shadow-sm' : 'text-stone-500 hover:text-stone-700'
                   }`}
                 >
-                  <LayoutDashboard className="w-4 h-4" />
-                  <span className="hidden xs:block">Admin</span>
+                  <Lock className="w-4 h-4" />
+                  <span className="hidden xs:block">Portal Admin</span>
                 </button>
               </div>
             )}

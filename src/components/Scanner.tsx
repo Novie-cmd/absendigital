@@ -1,10 +1,61 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, limit } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, limit, getDoc, doc } from 'firebase/firestore';
+import { db, auth } from '../firebase';
 import { format } from 'date-fns';
 import { CheckCircle2, XCircle, Clock, User as UserIcon, LogIn, LogOut, Camera, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 export default function Scanner() {
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string; data?: any } | null>(null);
@@ -82,7 +133,14 @@ export default function Scanner() {
       // 1. Find employee by employeeId (decodedText)
       const employeesRef = collection(db, 'employees');
       const q = query(employeesRef, where('employeeId', '==', decodedText));
-      const querySnapshot = await getDocs(q);
+      
+      let querySnapshot;
+      try {
+        querySnapshot = await getDocs(q);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, 'employees');
+        return;
+      }
 
       if (querySnapshot.empty) {
         setScanResult({ success: false, message: 'Pegawai tidak ditemukan. Silakan hubungi admin.' });
@@ -95,29 +153,47 @@ export default function Scanner() {
 
       // 2. Check last attendance for today
       const attendanceRef = collection(db, 'attendance');
+      // Kita tidak menggunakan orderBy di sini untuk menghindari kebutuhan Composite Index di Firestore
       const attendanceQuery = query(
         attendanceRef,
         where('employeeId', '==', decodedText),
-        where('date', '==', today),
-        orderBy('timestamp', 'desc'),
-        limit(1)
+        where('date', '==', today)
       );
-      const attendanceSnapshot = await getDocs(attendanceQuery);
+      
+      let attendanceSnapshot;
+      try {
+        attendanceSnapshot = await getDocs(attendanceQuery);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, 'attendance');
+        return;
+      }
 
       let type: 'in' | 'out' = 'in';
       if (!attendanceSnapshot.empty) {
-        const lastAttendance = attendanceSnapshot.docs[0].data();
+        // Urutkan di memori berdasarkan timestamp terbaru
+        const docs = attendanceSnapshot.docs.map(d => d.data());
+        docs.sort((a, b) => {
+          const timeA = a.timestamp?.toMillis?.() || 0;
+          const timeB = b.timestamp?.toMillis?.() || 0;
+          return timeB - timeA;
+        });
+        const lastAttendance = docs[0];
         type = lastAttendance.type === 'in' ? 'out' : 'in';
       }
 
       // 3. Record attendance
-      await addDoc(attendanceRef, {
-        employeeId: decodedText,
-        employeeName,
-        type,
-        timestamp: serverTimestamp(),
-        date: today
-      });
+      try {
+        await addDoc(attendanceRef, {
+          employeeId: decodedText,
+          employeeName,
+          type,
+          timestamp: serverTimestamp(),
+          date: today
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, 'attendance');
+        return;
+      }
 
       setScanResult({
         success: true,
@@ -127,7 +203,17 @@ export default function Scanner() {
 
     } catch (error) {
       console.error('Attendance error:', error);
-      setScanResult({ success: false, message: 'Terjadi kesalahan sistem. Silakan coba lagi.' });
+      // Jika error adalah JSON string dari handleFirestoreError, parse pesannya
+      let displayMessage = 'Terjadi kesalahan sistem. Silakan coba lagi.';
+      try {
+        const parsedError = JSON.parse((error as Error).message);
+        if (parsedError.error) {
+          displayMessage = `Kesalahan: ${parsedError.error}`;
+        }
+      } catch (e) {
+        // Bukan JSON, gunakan default
+      }
+      setScanResult({ success: false, message: displayMessage });
     }
   }
 
