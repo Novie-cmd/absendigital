@@ -16,14 +16,25 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      if (currentUser) {
-        // Check if user is admin
+      
+      if (!currentUser) {
+        setIsAdmin(false);
+        setLoading(false);
+        return;
+      }
+
+      // Segera hilangkan loading spinner setelah status auth diketahui
+      // Admin check akan berjalan di background
+      setLoading(false);
+
+      try {
+        // Cek apakah user adalah admin
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         const isAdminEmail = currentUser.email === 'noviharyanto062@gmail.com';
         
         if (isAdminEmail || (userDoc.exists() && userDoc.data().role === 'admin')) {
           setIsAdmin(true);
-          // If admin doesn't exist in users collection, create it
+          // Jika admin belum ada di koleksi users, buat datanya
           if (!userDoc.exists() && isAdminEmail) {
             await setDoc(doc(db, 'users', currentUser.uid), {
               email: currentUser.email,
@@ -34,10 +45,11 @@ export default function App() {
         } else {
           setIsAdmin(false);
         }
-      } else {
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+        // Jika gagal cek admin (misal: koneksi lambat), tetap biarkan user masuk sebagai pegawai
         setIsAdmin(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();

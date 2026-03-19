@@ -51,21 +51,28 @@ export default function Dashboard() {
 
     // 4. Get chart data (last 7 days)
     const fetchChartData = async () => {
-      const data = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = subDays(new Date(), i);
-        const dateStr = format(date, 'yyyy-MM-dd');
-        const q = query(attendanceRef, where('date', '==', dateStr), where('type', '==', 'in'));
-        const snapshot = await getDocs(q);
-        const uniquePresent = new Set(snapshot.docs.map(doc => doc.data().employeeId)).size;
-        data.push({
-          name: format(date, 'EEE'),
-          present: uniquePresent,
-          date: dateStr
+      try {
+        const days = Array.from({ length: 7 }, (_, i) => 6 - i);
+        const promises = days.map(async (i) => {
+          const date = subDays(new Date(), i);
+          const dateStr = format(date, 'yyyy-MM-dd');
+          const q = query(attendanceRef, where('date', '==', dateStr), where('type', '==', 'in'));
+          const snapshot = await getDocs(q);
+          const uniquePresent = new Set(snapshot.docs.map(doc => doc.data().employeeId)).size;
+          return {
+            name: format(date, 'EEE'),
+            present: uniquePresent,
+            date: dateStr
+          };
         });
+
+        const data = await Promise.all(promises);
+        setChartData(data);
+      } catch (error) {
+        console.error('Error fetching chart data:', error);
+      } finally {
+        setLoading(false);
       }
-      setChartData(data);
-      setLoading(false);
     };
 
     fetchChartData();

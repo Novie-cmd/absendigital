@@ -9,18 +9,45 @@ import { motion, AnimatePresence } from 'motion/react';
 export default function Scanner() {
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string; data?: any } | null>(null);
   const [isScanning, setIsScanning] = useState(true);
+  const [isCameraLoading, setIsCameraLoading] = useState(true);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   useEffect(() => {
     if (isScanning) {
-      const scanner = new Html5QrcodeScanner(
-        'reader',
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false
-      );
+      setIsCameraLoading(true);
+      // Berikan sedikit jeda agar DOM siap
+      const timer = setTimeout(() => {
+        const scanner = new Html5QrcodeScanner(
+          'reader',
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          /* verbose= */ false
+        );
 
-      scanner.render(onScanSuccess, onScanFailure);
-      scannerRef.current = scanner;
+        scanner.render(
+          (decodedText) => {
+            onScanSuccess(decodedText);
+          },
+          (error) => {
+            // onScanFailure - Abaikan error scan rutin
+            setIsCameraLoading(false);
+          }
+        );
+        
+        scannerRef.current = scanner;
+        
+        // Cek apakah video element sudah muncul
+        const checkVideo = setInterval(() => {
+          const video = document.querySelector('#reader video');
+          if (video) {
+            setIsCameraLoading(false);
+            clearInterval(checkVideo);
+          }
+        }, 100);
+
+        return () => clearInterval(checkVideo);
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
 
     return () => {
@@ -115,12 +142,20 @@ export default function Scanner() {
               exit={{ opacity: 0 }}
               className="relative"
             >
-              <div id="reader" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-stone-200"></div>
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div className="w-64 h-64 border-2 border-emerald-500 rounded-3xl animate-pulse flex items-center justify-center">
-                  <div className="w-full h-0.5 bg-emerald-500 absolute top-1/2 -translate-y-1/2 animate-[scan_2s_linear_infinite]"></div>
+              {isCameraLoading && (
+                <div className="absolute inset-0 z-10 bg-white flex flex-col items-center justify-center gap-4 rounded-2xl">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600"></div>
+                  <p className="text-stone-500 text-sm animate-pulse">Menyiapkan Kamera...</p>
                 </div>
-              </div>
+              )}
+              <div id="reader" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-stone-200"></div>
+              {!isCameraLoading && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div className="w-64 h-64 border-2 border-emerald-500 rounded-3xl animate-pulse flex items-center justify-center">
+                    <div className="w-full h-0.5 bg-emerald-500 absolute top-1/2 -translate-y-1/2 animate-[scan_2s_linear_infinite]"></div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           ) : (
             <motion.div
