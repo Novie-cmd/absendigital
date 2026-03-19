@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
-import { Users, UserCheck, UserMinus, Clock, TrendingUp } from 'lucide-react';
+import { Users, UserCheck, UserMinus, Clock, TrendingUp, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { motion } from 'motion/react';
 
@@ -16,6 +16,7 @@ export default function Dashboard() {
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -24,6 +25,10 @@ export default function Dashboard() {
     const employeesRef = collection(db, 'employees');
     const unsubscribeEmployees = onSnapshot(employeesRef, (snapshot) => {
       setStats(prev => ({ ...prev, totalEmployees: snapshot.size }));
+      setError(null);
+    }, (err) => {
+      console.error('Dashboard: Employees snapshot error:', err);
+      setError('Gagal memuat data dashboard. Pastikan Anda memiliki izin yang cukup.');
     });
 
     // 2. Get attendance today
@@ -41,12 +46,24 @@ export default function Dashboard() {
         presentToday: presentIds.size,
         absentToday: Math.max(0, prev.totalEmployees - presentIds.size)
       }));
+    }, (err) => {
+      console.error('Dashboard: Today attendance snapshot error:', err);
     });
 
     // 3. Get recent activity
-    const recentQuery = query(attendanceRef, orderBy('timestamp', 'desc'), limit(5));
+    const recentQuery = query(attendanceRef, limit(20));
     const unsubscribeRecent = onSnapshot(recentQuery, (snapshot) => {
-      setRecentActivity(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const sorted = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a: any, b: any) => {
+          const timeA = a.timestamp?.toMillis?.() || 0;
+          const timeB = b.timestamp?.toMillis?.() || 0;
+          return timeB - timeA;
+        })
+        .slice(0, 5);
+      setRecentActivity(sorted);
+    }, (err) => {
+      console.error('Dashboard: Recent activity snapshot error:', err);
     });
 
     // 4. Get chart data (last 7 days)
@@ -92,6 +109,22 @@ export default function Dashboard() {
   ];
 
   if (loading) return <div className="animate-pulse space-y-8">...</div>;
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-3xl p-8 text-center">
+        <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+        <h3 className="text-xl font-bold text-red-900 mb-2">Terjadi Kesalahan</h3>
+        <p className="text-red-700 mb-6">{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="bg-red-600 text-white px-6 py-2 rounded-xl hover:bg-red-700 transition-all"
+        >
+          Muat Ulang Halaman
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

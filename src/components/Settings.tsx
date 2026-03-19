@@ -11,6 +11,7 @@ export default function Settings() {
     lateThreshold: 15
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -19,6 +20,11 @@ export default function Settings() {
       if (docSnap.exists()) {
         setSettings(docSnap.data() as any);
       }
+      setLoading(false);
+      setError(null);
+    }, (err) => {
+      console.error('Settings: Snapshot error:', err);
+      setError('Gagal memuat pengaturan. Pastikan Anda memiliki izin yang cukup.');
       setLoading(false);
     });
     return () => unsubscribe();
@@ -32,15 +38,31 @@ export default function Settings() {
       await setDoc(doc(db, 'settings', 'config'), settings);
       setMessage({ type: 'success', text: 'Pengaturan berhasil disimpan!' });
       setTimeout(() => setMessage(null), 3000);
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      setMessage({ type: 'error', text: 'Gagal menyimpan pengaturan.' });
+    } catch (err: any) {
+      console.error('Error saving settings:', err);
+      setMessage({ type: 'error', text: 'Gagal menyimpan pengaturan: ' + (err.message || 'Terjadi kesalahan.') });
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) return <div className="animate-pulse space-y-8">...</div>;
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-3xl p-8 text-center">
+        <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+        <h3 className="text-xl font-bold text-red-900 mb-2">Terjadi Kesalahan</h3>
+        <p className="text-red-700 mb-6">{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="bg-red-600 text-white px-6 py-2 rounded-xl hover:bg-red-700 transition-all"
+        >
+          Muat Ulang Halaman
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">

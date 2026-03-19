@@ -171,6 +171,15 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        {/* Debug Info (Only for Admin Email) */}
+        {user.email === 'noviharyanto062@gmail.com' && (
+          <div className="mb-4 p-2 bg-stone-100 rounded-lg text-[10px] text-stone-400 font-mono flex gap-4">
+            <span>UID: {user.uid}</span>
+            <span>Email: {user.email}</span>
+            <span>Admin: {isAdmin ? 'YES' : 'NO'}</span>
+            <span>View: {view}</span>
+          </div>
+        )}
         <AnimatePresence mode="wait">
           {view === 'scan' ? (
             <motion.div

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, Settings as SettingsIcon, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, Settings as SettingsIcon, FileText, Activity } from 'lucide-react';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 import Dashboard from './Dashboard';
 import EmployeeManagement from './EmployeeManagement';
 import Settings from './Settings';
@@ -9,6 +11,23 @@ type AdminView = 'dashboard' | 'employees' | 'settings' | 'reports';
 
 export default function AdminPortal() {
   const [activeView, setActiveView] = useState<AdminView>('dashboard');
+  const [testingConnection, setTestingConnection] = useState(false);
+
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+    try {
+      await setDoc(doc(db, 'test_connection', 'status'), {
+        lastTest: serverTimestamp(),
+        status: 'ok'
+      });
+      alert('Koneksi ke Database Berhasil!');
+    } catch (error: any) {
+      console.error('Connection test error:', error);
+      alert('Koneksi ke Database Gagal: ' + (error.message || 'Terjadi kesalahan.'));
+    } finally {
+      setTestingConnection(false);
+    }
+  };
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard Absensi', icon: LayoutDashboard },
@@ -38,6 +57,17 @@ export default function AdminPortal() {
               </button>
             ))}
           </nav>
+          
+          <div className="mt-4 pt-4 border-t border-stone-100 px-2">
+            <button
+              onClick={handleTestConnection}
+              disabled={testingConnection}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-stone-400 hover:bg-stone-50 hover:text-stone-600 transition-all disabled:opacity-50"
+            >
+              <Activity className={`w-4 h-4 ${testingConnection ? 'animate-pulse' : ''}`} />
+              {testingConnection ? 'Mengetes...' : 'Tes Koneksi DB'}
+            </button>
+          </div>
         </div>
       </aside>
 

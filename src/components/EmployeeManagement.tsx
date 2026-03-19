@@ -27,16 +27,26 @@ export default function EmployeeManagement() {
     position: ''
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('EmployeeManagement: Checking data...');
-    const q = query(collection(db, 'employees'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'employees'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       console.log('EmployeeManagement: Received snapshot, size:', snapshot.size);
-      setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
+      const sortedEmployees = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Employee))
+        .sort((a, b) => {
+          const timeA = a.createdAt?.toMillis?.() || 0;
+          const timeB = b.createdAt?.toMillis?.() || 0;
+          return timeB - timeA;
+        });
+      setEmployees(sortedEmployees);
       setLoading(false);
-    }, (error) => {
-      console.error('EmployeeManagement: Snapshot error:', error);
+      setError(null);
+    }, (err) => {
+      console.error('EmployeeManagement: Snapshot error:', err);
+      setError('Gagal memuat data pegawai. Pastikan Anda memiliki izin yang cukup.');
       setLoading(false);
     });
     return () => unsubscribe();
@@ -159,6 +169,8 @@ export default function EmployeeManagement() {
             <tbody className="divide-y divide-stone-100">
               {loading ? (
                 <tr><td colSpan={5} className="px-6 py-12 text-center text-stone-400">Memuat data...</td></tr>
+              ) : error ? (
+                <tr><td colSpan={5} className="px-6 py-12 text-center text-red-500 font-medium">{error}</td></tr>
               ) : filteredEmployees.length === 0 ? (
                 <tr><td colSpan={5} className="px-6 py-12 text-center text-stone-400">Tidak ada data pegawai.</td></tr>
               ) : (
