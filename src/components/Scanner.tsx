@@ -352,6 +352,7 @@ export default function Scanner() {
             >
               {scanResult?.success ? (
                 <>
+                  <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em] mb-4">Kesbangpoldagri NTB</p>
                   <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
                     <CheckCircle2 className="w-12 h-12 text-emerald-600" />
                   </div>
@@ -394,6 +395,7 @@ export default function Scanner() {
                 </>
               ) : (
                 <>
+                  <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em] mb-4">Kesbangpoldagri NTB</p>
                   <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6">
                     <XCircle className="w-12 h-12 text-red-600" />
                   </div>

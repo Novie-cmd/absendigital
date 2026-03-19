@@ -143,6 +143,7 @@ export default function App() {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-stone-200"
         >
+          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em] mb-4">Kesbangpoldagri NTB</p>
           <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <ScanLine className="w-10 h-10 text-emerald-600" />
           </div>
@@ -169,6 +170,7 @@ export default function App() {
           className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 border border-stone-200"
         >
           <div className="text-center mb-8">
+            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em] mb-4">Kesbangpoldagri NTB</p>
             <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <UserPlus className="w-8 h-8 text-blue-600" />
             </div>
@@ -215,11 +217,14 @@ export default function App() {
       {/* Navigation */}
       <nav className="bg-white border-b border-stone-200 px-4 py-3 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100">
-              <ScanLine className="w-6 h-6 text-white" />
+          <div className="flex flex-col">
+            <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest leading-none mb-1.5 ml-1">Kesbangpoldagri NTB</span>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100">
+                <ScanLine className="w-6 h-6 text-white" />
+              </div>
+              <span className="font-bold text-xl text-stone-900 hidden sm:block">Absensi Pegawai</span>
             </div>
-            <span className="font-bold text-xl text-stone-900 hidden sm:block">Absensi Pegawai</span>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
