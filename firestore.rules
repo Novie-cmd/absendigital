@@ -83,5 +83,9 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
+
+    match /test_connection/{testId} {
+      allow read, write: if isAdmin();
+    }
   }
 }

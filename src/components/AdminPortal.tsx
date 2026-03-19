@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, Settings as SettingsIcon, FileText, Activity } from 'lucide-react';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { LayoutDashboard, Users, Settings as SettingsIcon, FileText, Activity, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { doc, setDoc, serverTimestamp, getDocFromCache, getDocFromServer } from 'firebase/firestore';
 import { db } from '../firebase';
 import Dashboard from './Dashboard';
 import EmployeeManagement from './EmployeeManagement';
@@ -12,18 +12,41 @@ type AdminView = 'dashboard' | 'employees' | 'settings' | 'reports';
 export default function AdminPortal() {
   const [activeView, setActiveView] = useState<AdminView>('dashboard');
   const [testingConnection, setTestingConnection] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const handleTestConnection = async () => {
     setTestingConnection(true);
+    setTestResult(null);
+    console.log('Starting DB connection test...');
+    
     try {
-      await setDoc(doc(db, 'test_connection', 'status'), {
+      // 1. Try to write to a test collection
+      const testDocRef = doc(db, 'test_connection', 'status');
+      await setDoc(testDocRef, {
         lastTest: serverTimestamp(),
-        status: 'ok'
+        status: 'ok',
+        testedBy: 'admin'
       });
-      alert('Koneksi ke Database Berhasil!');
+      
+      // 2. Try to read it back from server (not cache) to ensure real connectivity
+      const snap = await getDocFromServer(testDocRef);
+      
+      if (snap.exists()) {
+        setTestResult({ success: true, message: 'Koneksi ke Database Berhasil! Database aktif dan merespon.' });
+      } else {
+        setTestResult({ success: false, message: 'Koneksi berhasil tapi data tidak ditemukan. Silakan cek izin Firestore.' });
+      }
     } catch (error: any) {
       console.error('Connection test error:', error);
-      alert('Koneksi ke Database Gagal: ' + (error.message || 'Terjadi kesalahan.'));
+      let msg = 'Koneksi Gagal: ' + (error.message || 'Terjadi kesalahan.');
+      
+      if (error.message?.includes('the client is offline')) {
+        msg = 'Database Offline: Periksa konfigurasi Firebase Anda atau koneksi internet.';
+      } else if (error.code === 'permission-denied') {
+        msg = 'Izin Ditolak: Akun Anda mungkin belum terdaftar sebagai Admin di sistem.';
+      }
+      
+      setTestResult({ success: false, message: msg });
     } finally {
       setTestingConnection(false);
     }
@@ -58,15 +81,30 @@ export default function AdminPortal() {
             ))}
           </nav>
           
-          <div className="mt-4 pt-4 border-t border-stone-100 px-2">
+          <div className="mt-4 pt-4 border-t border-stone-100 px-2 space-y-2">
             <button
               onClick={handleTestConnection}
               disabled={testingConnection}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-stone-400 hover:bg-stone-50 hover:text-stone-600 transition-all disabled:opacity-50"
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all disabled:opacity-50 ${
+                testResult?.success 
+                  ? 'bg-emerald-50 text-emerald-600' 
+                  : testResult === null 
+                    ? 'text-stone-400 hover:bg-stone-50 hover:text-stone-600'
+                    : 'bg-red-50 text-red-600'
+              }`}
             >
               <Activity className={`w-4 h-4 ${testingConnection ? 'animate-pulse' : ''}`} />
               {testingConnection ? 'Mengetes...' : 'Tes Koneksi DB'}
             </button>
+
+            {testResult && (
+              <div className={`p-3 rounded-xl text-[10px] flex gap-2 items-start ${
+                testResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+              }`}>
+                {testResult.success ? <CheckCircle2 className="w-3 h-3 mt-0.5 flex-shrink-0" /> : <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />}
+                <span>{testResult.message}</span>
+              </div>
+            )}
           </div>
         </div>
       </aside>
