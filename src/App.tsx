@@ -14,54 +14,36 @@ export default function App() {
   const [view, setView] = useState<'scan' | 'admin'>('scan');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      
-      if (!currentUser) {
-        setIsAdmin(false);
-        setLoading(false);
-        return;
-      }
-
-      // Segera hilangkan loading spinner setelah status auth diketahui
-      // Admin check akan berjalan di background
       setLoading(false);
-
-      try {
-        // Cek email admin utama dulu (paling aman)
-        const isAdminEmail = currentUser.email?.toLowerCase() === 'noviharyanto062@gmail.com';
-        console.log('Checking admin for:', currentUser.email, 'isAdminEmail:', isAdminEmail);
-        
-        if (isAdminEmail) {
-          setIsAdmin(true);
-          // Cek di background apakah data user sudah ada
-          getDoc(doc(db, 'users', currentUser.uid)).then(async (userDoc) => {
-            if (!userDoc.exists()) {
-              await setDoc(doc(db, 'users', currentUser.uid), {
-                email: currentUser.email,
-                role: 'admin',
-                createdAt: serverTimestamp()
-              });
-            }
-          });
-        } else {
-          // Jika bukan email admin utama, cek di database (untuk admin tambahan)
-          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-          if (userDoc.exists() && userDoc.data().role === 'admin') {
-            setIsAdmin(true);
-          } else {
-            setIsAdmin(false);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking admin status:', error);
-        // Jika gagal cek admin (misal: koneksi lambat), tetap biarkan user masuk sebagai pegawai
-        setIsAdmin(false);
-      }
     });
 
     return () => unsubscribe();
   }, []);
+
+  // Hardened Admin Check
+  useEffect(() => {
+    if (!user) {
+      setIsAdmin(false);
+      return;
+    }
+
+    const adminEmail = 'noviharyanto062@gmail.com';
+    const userEmail = user.email?.toLowerCase().trim();
+    
+    if (userEmail === adminEmail) {
+      console.log('Admin detected via email match');
+      setIsAdmin(true);
+    } else {
+      // Fallback to Firestore for other admins
+      getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
+        if (userDoc.exists() && userDoc.data().role === 'admin') {
+          setIsAdmin(true);
+        }
+      }).catch(err => console.error('Admin check error:', err));
+    }
+  }, [user]);
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
@@ -166,7 +148,14 @@ export default function App() {
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold text-stone-900 leading-none">{user.displayName}</p>
                 <p className="text-[10px] text-stone-400 mt-0.5">{user.email}</p>
-                <p className="text-xs text-stone-500 mt-1">{isAdmin ? 'Administrator' : 'Pegawai'}</p>
+                <div className="flex items-center justify-end gap-1.5 mt-1">
+                  {isAdmin && (
+                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded uppercase tracking-wider">
+                      Admin
+                    </span>
+                  )}
+                  <p className="text-xs text-stone-500">{isAdmin ? 'Administrator' : 'Pegawai'}</p>
+                </div>
               </div>
               <button
                 onClick={handleLogout}

@@ -29,9 +29,14 @@ export default function EmployeeManagement() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('EmployeeManagement: Checking data...');
     const q = query(collection(db, 'employees'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log('EmployeeManagement: Received snapshot, size:', snapshot.size);
       setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
+      setLoading(false);
+    }, (error) => {
+      console.error('EmployeeManagement: Snapshot error:', error);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -53,8 +58,11 @@ export default function EmployeeManagement() {
     setIsModalOpen(true);
   };
 
+  const [saving, setSaving] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
       if (selectedEmployee) {
         await updateDoc(doc(db, 'employees', selectedEmployee.id), formData);
@@ -65,8 +73,11 @@ export default function EmployeeManagement() {
         });
       }
       setIsModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving employee:', error);
+      alert('Gagal menyimpan data pegawai: ' + (error.message || 'Terjadi kesalahan.'));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -268,10 +279,15 @@ export default function EmployeeManagement() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2"
+                    disabled={saving}
+                    className="flex-1 px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Save className="w-5 h-5" />
-                    Simpan
+                    {saving ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    ) : (
+                      <Save className="w-5 h-5" />
+                    )}
+                    {saving ? 'Menyimpan...' : 'Simpan'}
                   </button>
                 </div>
               </form>
