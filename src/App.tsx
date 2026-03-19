@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { LogIn, LogOut, LayoutDashboard, Users, Settings as SettingsIcon, FileText, ScanLine, Lock } from 'lucide-react';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { LogIn, LogOut, LayoutDashboard, Users, Settings as SettingsIcon, FileText, ScanLine, Lock, UserPlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Scanner from './components/Scanner';
 import AdminPortal from './components/AdminPortal';
@@ -10,22 +10,28 @@ import AdminPortal from './components/AdminPortal';
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'scan' | 'admin'>('scan');
+  const [linking, setLinking] = useState(false);
+  const [linkId, setLinkId] = useState('');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      setLoading(false);
+      if (!currentUser) {
+        setLoading(false);
+      }
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Hardened Admin Check
+  // Hardened Admin & Employee Check
   useEffect(() => {
     if (!user) {
       setIsAdmin(false);
+      setEmployeeId(null);
       return;
     }
 
@@ -33,17 +39,65 @@ export default function App() {
     const userEmail = user.email?.toLowerCase().trim();
     
     if (userEmail === adminEmail) {
-      console.log('Admin detected via email match');
       setIsAdmin(true);
-    } else {
-      // Fallback to Firestore for other admins
-      getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
-        if (userDoc.exists() && userDoc.data().role === 'admin') {
-          setIsAdmin(true);
-        }
-      }).catch(err => console.error('Admin check error:', err));
     }
+
+    // Fetch user profile from Firestore
+    const fetchProfile = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data.role === 'admin') setIsAdmin(true);
+          if (data.employeeId) setEmployeeId(data.employeeId);
+        }
+      } catch (err) {
+        console.error('Profile fetch error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
   }, [user]);
+
+  const handleLinkAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !linkId.trim()) return;
+    
+    setLinking(true);
+    try {
+      // 1. Verify if employeeId exists in employees collection
+      const employeesRef = collection(db, 'employees');
+      const q = query(employeesRef, where('employeeId', '==', linkId.trim()));
+      const snap = await getDocs(q);
+      
+      if (snap.empty) {
+        alert('ID Pegawai tidak ditemukan. Silakan hubungi admin untuk mendaftarkan ID Anda.');
+        return;
+      }
+
+      const employeeData = snap.docs[0].data();
+
+      // 2. Link to user document
+      await setDoc(doc(db, 'users', user.uid), {
+        email: user.email,
+        name: user.displayName,
+        employeeId: linkId.trim(),
+        employeeName: employeeData.name,
+        role: 'employee',
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      setEmployeeId(linkId.trim());
+      alert(`Berhasil menghubungkan akun dengan ${employeeData.name}!`);
+    } catch (error: any) {
+      console.error('Linking error:', error);
+      alert('Gagal menghubungkan akun: ' + (error.message || 'Terjadi kesalahan.'));
+    } finally {
+      setLinking(false);
+    }
+  };
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
@@ -93,13 +147,63 @@ export default function App() {
             <ScanLine className="w-10 h-10 text-emerald-600" />
           </div>
           <h1 className="text-3xl font-bold text-stone-900 mb-2">Sistem Absensi</h1>
-          <p className="text-stone-500 mb-8">Silakan masuk dengan akun Google Anda untuk melanjutkan.</p>
+          <p className="text-stone-500 mb-8">Silakan masuk dengan akun Google Anda untuk melakukan absensi.</p>
           <button
             onClick={handleLogin}
             className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-emerald-200"
           >
             <LogIn className="w-5 h-5" />
             Masuk dengan Google
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!isAdmin && !employeeId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-stone-50 p-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 border border-stone-200"
+        >
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <UserPlus className="w-8 h-8 text-blue-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-stone-900">Hubungkan Akun</h1>
+            <p className="text-stone-500 text-sm mt-2">
+              Masukkan ID Pegawai Anda untuk menghubungkan akun Google ini dengan data kehadiran Anda.
+            </p>
+          </div>
+
+          <form onSubmit={handleLinkAccount} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1">ID Pegawai (NIK/NIP)</label>
+              <input
+                required
+                type="text"
+                value={linkId}
+                onChange={(e) => setLinkId(e.target.value)}
+                placeholder="Contoh: EMP001"
+                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={linking}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
+            >
+              {linking ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : 'Hubungkan Sekarang'}
+            </button>
+          </form>
+
+          <button
+            onClick={handleLogout}
+            className="w-full mt-4 text-stone-400 text-sm hover:text-stone-600 transition-all"
+          >
+            Keluar dan gunakan akun lain
           </button>
         </motion.div>
       </div>

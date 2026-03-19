@@ -35,13 +35,28 @@
       "properties": {
         "workStartTime": { "type": "string", "description": "HH:mm" },
         "workEndTime": { "type": "string", "description": "HH:mm" },
-        "lateThreshold": { "type": "integer", "description": "Minutes after start time to be considered late" }
+        "lateThreshold": { "type": "integer", "description": "Minutes after start time to be considered late" },
+        "officeQrToken": { "type": "string", "description": "Token for office QR code" }
+      }
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and linking data",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "employeeId": { "type": "string", "description": "Linked employee ID" },
+        "employeeName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "employee"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
       }
     }
   },
   "firestore": {
     "/employees": { "schema": "Employee", "description": "Collection of employees" },
     "/attendance": { "schema": "Attendance", "description": "Collection of attendance records" },
-    "/settings": { "schema": "Setting", "description": "App settings" }
+    "/settings": { "schema": "Setting", "description": "App settings" },
+    "/users": { "schema": "User", "description": "Collection of users" }
   }
 }

@@ -58,11 +58,26 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 export default function Scanner() {
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [officeToken, setOfficeToken] = useState<string>('OFFICE_ATTENDANCE_TOKEN_123');
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string; data?: any } | null>(null);
   const [isScanning, setIsScanning] = useState(true);
   const [isCameraLoading, setIsCameraLoading] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+
+  useEffect(() => {
+    // Fetch user profile and office token
+    const fetchData = async () => {
+      if (auth.currentUser) {
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (userDoc.exists()) setUserProfile(userDoc.data());
+      }
+      const settingsDoc = await getDoc(doc(db, 'settings', 'config'));
+      if (settingsDoc.exists()) setOfficeToken(settingsDoc.data().officeQrToken);
+    };
+    fetchData();
+  }, []);
 
   useEffect(() => {
     if (isScanning && !scanResult) {
@@ -130,9 +145,22 @@ export default function Scanner() {
     setIsScanning(false);
     
     try {
-      // 1. Find employee by employeeId (decodedText)
+      let targetEmployeeId = decodedText;
+      let targetEmployeeName = '';
+
+      // Check if it's an Office QR scan by an employee
+      if (decodedText === officeToken) {
+        if (!userProfile?.employeeId) {
+          setScanResult({ success: false, message: 'Akun Anda belum terhubung dengan ID Pegawai.' });
+          return;
+        }
+        targetEmployeeId = userProfile.employeeId;
+        targetEmployeeName = userProfile.employeeName || 'Pegawai';
+      }
+
+      // 1. Find employee by employeeId
       const employeesRef = collection(db, 'employees');
-      const q = query(employeesRef, where('employeeId', '==', decodedText));
+      const q = query(employeesRef, where('employeeId', '==', targetEmployeeId));
       
       let querySnapshot;
       try {
@@ -148,15 +176,14 @@ export default function Scanner() {
       }
 
       const employee = querySnapshot.docs[0].data();
-      const employeeName = employee.name;
+      targetEmployeeName = employee.name;
       const today = format(new Date(), 'yyyy-MM-dd');
 
       // 2. Check last attendance for today
       const attendanceRef = collection(db, 'attendance');
-      // Kita tidak menggunakan orderBy di sini untuk menghindari kebutuhan Composite Index di Firestore
       const attendanceQuery = query(
         attendanceRef,
-        where('employeeId', '==', decodedText),
+        where('employeeId', '==', targetEmployeeId),
         where('date', '==', today)
       );
       
@@ -170,7 +197,6 @@ export default function Scanner() {
 
       let type: 'in' | 'out' = 'in';
       if (!attendanceSnapshot.empty) {
-        // Urutkan di memori berdasarkan timestamp terbaru
         const docs = attendanceSnapshot.docs.map(d => d.data());
         docs.sort((a, b) => {
           const timeA = a.timestamp?.toMillis?.() || 0;
@@ -184,11 +210,12 @@ export default function Scanner() {
       // 3. Record attendance
       try {
         await addDoc(attendanceRef, {
-          employeeId: decodedText,
-          employeeName,
+          employeeId: targetEmployeeId,
+          employeeName: targetEmployeeName,
           type,
           timestamp: serverTimestamp(),
-          date: today
+          date: today,
+          method: decodedText === officeToken ? 'self_scan' : 'admin_scan'
         });
       } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, 'attendance');
@@ -198,7 +225,7 @@ export default function Scanner() {
       setScanResult({
         success: true,
         message: `Absen ${type === 'in' ? 'Hadir' : 'Pulang'} Berhasil!`,
-        data: { name: employeeName, type, time: format(new Date(), 'HH:mm:ss') }
+        data: { name: targetEmployeeName, type, time: format(new Date(), 'HH:mm:ss') }
       });
 
     } catch (error) {

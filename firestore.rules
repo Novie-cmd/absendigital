@@ -59,13 +59,20 @@ service cloud.firestore {
              data.lateThreshold is number;
     }
 
+    function isValidUser(data) {
+      return data.email is string && data.name is string &&
+             (data.role in ['admin', 'employee']) &&
+             (!('employeeId' in data) || (data.employeeId is string && data.employeeId.size() < 50));
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow write: if isAdmin();
+      allow create, update: if isAuthenticated() && (request.auth.uid == userId) && isValidUser(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /employees/{employeeId} {
