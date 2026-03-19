@@ -28,23 +28,30 @@ export default function App() {
       setLoading(false);
 
       try {
-        // Cek apakah user adalah admin
-        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-        // Gunakan email dari context user
+        // Cek email admin utama dulu (paling aman)
         const isAdminEmail = currentUser.email?.toLowerCase() === 'noviharyanto062@gmail.com';
+        console.log('Checking admin for:', currentUser.email, 'isAdminEmail:', isAdminEmail);
         
-        if (isAdminEmail || (userDoc.exists() && userDoc.data().role === 'admin')) {
+        if (isAdminEmail) {
           setIsAdmin(true);
-          // Jika admin belum ada di koleksi users, buat datanya
-          if (!userDoc.exists() && isAdminEmail) {
-            await setDoc(doc(db, 'users', currentUser.uid), {
-              email: currentUser.email,
-              role: 'admin',
-              createdAt: serverTimestamp()
-            });
-          }
+          // Cek di background apakah data user sudah ada
+          getDoc(doc(db, 'users', currentUser.uid)).then(async (userDoc) => {
+            if (!userDoc.exists()) {
+              await setDoc(doc(db, 'users', currentUser.uid), {
+                email: currentUser.email,
+                role: 'admin',
+                createdAt: serverTimestamp()
+              });
+            }
+          });
         } else {
-          setIsAdmin(false);
+          // Jika bukan email admin utama, cek di database (untuk admin tambahan)
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDoc.exists() && userDoc.data().role === 'admin') {
+            setIsAdmin(true);
+          } else {
+            setIsAdmin(false);
+          }
         }
       } catch (error) {
         console.error('Error checking admin status:', error);
@@ -139,16 +146,16 @@ export default function App() {
                   }`}
                 >
                   <ScanLine className="w-4 h-4" />
-                  <span className="hidden xs:block">Scan</span>
+                  <span className="hidden sm:block">Scan</span>
                 </button>
                 <button
                   onClick={() => setView('admin')}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    view === 'admin' ? 'bg-white text-emerald-600 shadow-sm' : 'text-stone-500 hover:text-stone-700'
+                    view === 'admin' ? 'bg-emerald-600 text-white shadow-md' : 'text-stone-500 hover:text-stone-700'
                   }`}
                 >
-                  <Lock className="w-4 h-4" />
-                  <span className="hidden xs:block">Portal Admin</span>
+                  <Lock className={`w-4 h-4 ${view === 'admin' ? 'text-white' : 'text-stone-400'}`} />
+                  <span className="hidden sm:block">Portal Admin</span>
                 </button>
               </div>
             )}
