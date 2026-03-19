@@ -1,3 +1,0 @@
-git add firebase-applet-config.json
-git commit -m "Add firebase config"
-git push
