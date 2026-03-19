@@ -158,6 +158,7 @@ export default function App() {
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold text-stone-900 leading-none">{user.displayName}</p>
+                <p className="text-[10px] text-stone-400 mt-0.5">{user.email}</p>
                 <p className="text-xs text-stone-500 mt-1">{isAdmin ? 'Administrator' : 'Pegawai'}</p>
               </div>
               <button
