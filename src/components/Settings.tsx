@@ -7,8 +7,10 @@ import { QRCodeSVG } from 'qrcode.react';
 
 export default function Settings() {
   const [settings, setSettings] = useState({
-    workStartTime: '08:00',
-    workEndTime: '17:00',
+    workStartTimeMonThu: '08:00',
+    workEndTimeMonThu: '17:00',
+    workStartTimeFri: '08:00',
+    workEndTimeFri: '16:30',
     lateThreshold: 15,
     officeQrToken: 'OFFICE_ATTENDANCE_TOKEN_123'
   });
@@ -97,30 +99,63 @@ export default function Settings() {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-stone-200 shadow-xl p-8 space-y-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-bold text-stone-700">
-                <Clock className="w-4 h-4 text-emerald-600" />
-                Jam Masuk Kerja
-              </label>
-              <input
-                type="time"
-                value={settings.workStartTime}
-                onChange={(e) => setSettings({ ...settings, workStartTime: e.target.value })}
-                className="w-full px-6 py-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-xl font-bold text-stone-900"
-              />
+          <div className="space-y-6">
+            <h3 className="text-lg font-bold text-stone-900 border-b border-stone-100 pb-2">Senin - Kamis</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-bold text-stone-700">
+                  <Clock className="w-4 h-4 text-emerald-600" />
+                  Jam Masuk
+                </label>
+                <input
+                  type="time"
+                  value={settings.workStartTimeMonThu}
+                  onChange={(e) => setSettings({ ...settings, workStartTimeMonThu: e.target.value })}
+                  className="w-full px-6 py-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-xl font-bold text-stone-900"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-bold text-stone-700">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  Jam Pulang
+                </label>
+                <input
+                  type="time"
+                  value={settings.workEndTimeMonThu}
+                  onChange={(e) => setSettings({ ...settings, workEndTimeMonThu: e.target.value })}
+                  className="w-full px-6 py-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-xl font-bold text-stone-900"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-bold text-stone-700">
-                <Clock className="w-4 h-4 text-amber-600" />
-                Jam Pulang Kerja
-              </label>
-              <input
-                type="time"
-                value={settings.workEndTime}
-                onChange={(e) => setSettings({ ...settings, workEndTime: e.target.value })}
-                className="w-full px-6 py-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-xl font-bold text-stone-900"
-              />
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="text-lg font-bold text-stone-900 border-b border-stone-100 pb-2">Jum'at</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-bold text-stone-700">
+                  <Clock className="w-4 h-4 text-emerald-600" />
+                  Jam Masuk
+                </label>
+                <input
+                  type="time"
+                  value={settings.workStartTimeFri}
+                  onChange={(e) => setSettings({ ...settings, workStartTimeFri: e.target.value })}
+                  className="w-full px-6 py-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-xl font-bold text-stone-900"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-bold text-stone-700">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  Jam Pulang
+                </label>
+                <input
+                  type="time"
+                  value={settings.workEndTimeFri}
+                  onChange={(e) => setSettings({ ...settings, workEndTimeFri: e.target.value })}
+                  className="w-full px-6 py-4 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-xl font-bold text-stone-900"
+                />
+              </div>
             </div>
           </div>
 

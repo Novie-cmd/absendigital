@@ -33,8 +33,10 @@
       "description": "App configuration",
       "type": "object",
       "properties": {
-        "workStartTime": { "type": "string", "description": "HH:mm" },
-        "workEndTime": { "type": "string", "description": "HH:mm" },
+        "workStartTimeMonThu": { "type": "string", "description": "HH:mm (Monday-Thursday)" },
+        "workEndTimeMonThu": { "type": "string", "description": "HH:mm (Monday-Thursday)" },
+        "workStartTimeFri": { "type": "string", "description": "HH:mm (Friday)" },
+        "workEndTimeFri": { "type": "string", "description": "HH:mm (Friday)" },
         "lateThreshold": { "type": "integer", "description": "Minutes after start time to be considered late" },
         "officeQrToken": { "type": "string", "description": "Token for office QR code" }
       }

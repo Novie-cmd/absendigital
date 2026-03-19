@@ -36,15 +36,19 @@ export default function Dashboard() {
     const todayQuery = query(attendanceRef, where('date', '==', today));
     const unsubscribeToday = onSnapshot(todayQuery, (snapshot) => {
       const presentIds = new Set();
+      let lateCount = 0;
       snapshot.docs.forEach(doc => {
-        if (doc.data().type === 'in') {
-          presentIds.add(doc.data().employeeId);
+        const data = doc.data();
+        if (data.type === 'in') {
+          presentIds.add(data.employeeId);
+          if (data.isLate) lateCount++;
         }
       });
       setStats(prev => ({ 
         ...prev, 
         presentToday: presentIds.size,
-        absentToday: Math.max(0, prev.totalEmployees - presentIds.size)
+        absentToday: Math.max(0, prev.totalEmployees - presentIds.size),
+        lateToday: lateCount
       }));
     }, (err) => {
       console.error('Dashboard: Today attendance snapshot error:', err);

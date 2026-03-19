@@ -59,7 +59,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 
 export default function Scanner() {
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [officeToken, setOfficeToken] = useState<string>('OFFICE_ATTENDANCE_TOKEN_123');
+  const [settings, setSettings] = useState<any>(null);
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string; data?: any } | null>(null);
   const [isScanning, setIsScanning] = useState(true);
   const [isCameraLoading, setIsCameraLoading] = useState(true);
@@ -74,7 +74,7 @@ export default function Scanner() {
         if (userDoc.exists()) setUserProfile(userDoc.data());
       }
       const settingsDoc = await getDoc(doc(db, 'settings', 'config'));
-      if (settingsDoc.exists()) setOfficeToken(settingsDoc.data().officeQrToken);
+      if (settingsDoc.exists()) setSettings(settingsDoc.data());
     };
     fetchData();
   }, []);
@@ -149,7 +149,7 @@ export default function Scanner() {
       let targetEmployeeName = '';
 
       // Check if it's an Office QR scan by an employee
-      if (decodedText === officeToken) {
+      if (decodedText === settings?.officeQrToken) {
         if (!userProfile?.employeeId) {
           setScanResult({ success: false, message: 'Akun Anda belum terhubung dengan ID Pegawai.' });
           return;
@@ -207,7 +207,48 @@ export default function Scanner() {
         type = lastAttendance.type === 'in' ? 'out' : 'in';
       }
 
-      // 3. Record attendance
+      // 3. Calculate Lateness
+      let isLate = false;
+      let isEarlyLeave = false;
+      
+      if (settings) {
+        const now = new Date();
+        const day = now.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
+        const currentTimeStr = format(now, 'HH:mm');
+        
+        let startTime = '';
+        let endTime = '';
+        
+        if (day >= 1 && day <= 4) { // Mon-Thu
+          startTime = settings.workStartTimeMonThu;
+          endTime = settings.workEndTimeMonThu;
+        } else if (day === 5) { // Fri
+          startTime = settings.workStartTimeFri;
+          endTime = settings.workEndTimeFri;
+        }
+        
+        if (startTime && type === 'in') {
+          const [startH, startM] = startTime.split(':').map(Number);
+          const [currH, currM] = currentTimeStr.split(':').map(Number);
+          const startTotal = startH * 60 + startM + (settings.lateThreshold || 0);
+          const currTotal = currH * 60 + currM;
+          if (currTotal > startTotal) {
+            isLate = true;
+          }
+        }
+        
+        if (endTime && type === 'out') {
+          const [endH, endM] = endTime.split(':').map(Number);
+          const [currH, currM] = currentTimeStr.split(':').map(Number);
+          const endTotal = endH * 60 + endM;
+          const currTotal = currH * 60 + currM;
+          if (currTotal < endTotal) {
+            isEarlyLeave = true;
+          }
+        }
+      }
+
+      // 4. Record attendance
       try {
         await addDoc(attendanceRef, {
           employeeId: targetEmployeeId,
@@ -215,7 +256,9 @@ export default function Scanner() {
           type,
           timestamp: serverTimestamp(),
           date: today,
-          method: decodedText === officeToken ? 'self_scan' : 'admin_scan'
+          method: decodedText === settings?.officeQrToken ? 'self_scan' : 'admin_scan',
+          isLate,
+          isEarlyLeave
         });
       } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, 'attendance');
@@ -225,7 +268,7 @@ export default function Scanner() {
       setScanResult({
         success: true,
         message: `Absen ${type === 'in' ? 'Hadir' : 'Pulang'} Berhasil!`,
-        data: { name: targetEmployeeName, type, time: format(new Date(), 'HH:mm:ss') }
+        data: { name: targetEmployeeName, type, time: format(new Date(), 'HH:mm:ss'), isLate, isEarlyLeave }
       });
 
     } catch (error) {
@@ -333,11 +376,19 @@ export default function Scanner() {
                         {scanResult.data?.type === 'in' ? <LogIn className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
                         <span className="text-sm">Status</span>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                        scanResult.data?.type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {scanResult.data?.type === 'in' ? 'Hadir' : 'Pulang'}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                          scanResult.data?.type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {scanResult.data?.type === 'in' ? 'Hadir' : 'Pulang'}
+                        </span>
+                        {scanResult.data?.isLate && scanResult.data?.type === 'in' && (
+                          <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider">Terlambat</span>
+                        )}
+                        {scanResult.data?.isEarlyLeave && scanResult.data?.type === 'out' && (
+                          <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Pulang Awal</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </>

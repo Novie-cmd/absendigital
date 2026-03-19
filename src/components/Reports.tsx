@@ -12,6 +12,8 @@ interface AttendanceRecord {
   type: 'in' | 'out';
   timestamp: any;
   date: string;
+  isLate?: boolean;
+  isEarlyLeave?: boolean;
 }
 
 export default function Reports() {
@@ -44,13 +46,14 @@ export default function Reports() {
   );
 
   const exportToCSV = () => {
-    const headers = ['Nama Pegawai', 'ID Pegawai', 'Tipe', 'Tanggal', 'Waktu'];
+    const headers = ['Nama Pegawai', 'ID Pegawai', 'Tipe', 'Tanggal', 'Waktu', 'Status'];
     const rows = filteredRecords.map(record => [
       record.employeeName,
       record.employeeId,
       record.type === 'in' ? 'Hadir' : 'Pulang',
       record.date,
-      record.timestamp?.toDate ? format(record.timestamp.toDate(), 'HH:mm:ss') : '--:--'
+      record.timestamp?.toDate ? format(record.timestamp.toDate(), 'HH:mm:ss') : '--:--',
+      record.isLate ? 'Terlambat' : record.isEarlyLeave ? 'Pulang Awal' : 'Tepat Waktu'
     ]);
 
     const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
@@ -152,12 +155,20 @@ export default function Reports() {
                     </td>
                     <td className="px-6 py-4 text-stone-600 font-mono text-sm">{record.employeeId}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1 w-fit ${
-                        record.type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {record.type === 'in' ? <LogIn className="w-3 h-3" /> : <LogOut className="w-3 h-3" />}
-                        {record.type === 'in' ? 'Hadir' : 'Pulang'}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1 w-fit ${
+                          record.type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {record.type === 'in' ? <LogIn className="w-3 h-3" /> : <LogOut className="w-3 h-3" />}
+                          {record.type === 'in' ? 'Hadir' : 'Pulang'}
+                        </span>
+                        {record.isLate && record.type === 'in' && (
+                          <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider ml-1">Terlambat</span>
+                        )}
+                        {record.isEarlyLeave && record.type === 'out' && (
+                          <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider ml-1">Pulang Awal</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-stone-600 text-sm">{record.date}</td>
                     <td className="px-6 py-4 text-right font-mono text-stone-900 font-bold">
