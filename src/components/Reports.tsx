@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { format, startOfMonth, endOfMonth, parseISO, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns';
-import { FileText, Download, Calendar, Search, Filter, User as UserIcon, Clock, LogIn, LogOut } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay, subDays } from 'date-fns';
+import { FileText, Download, Calendar, Search, Filter, User as UserIcon, Clock, LogIn, LogOut, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AttendanceRecord {
@@ -16,14 +16,33 @@ interface AttendanceRecord {
   isEarlyLeave?: boolean;
 }
 
+interface Employee {
+  id: string;
+  name: string;
+  employeeId: string;
+}
+
 export default function Reports() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Fetch employees for dropdown
+    const employeesQuery = query(collection(db, 'employees'), orderBy('name', 'asc'));
+    const unsubscribeEmployees = onSnapshot(employeesQuery, (snapshot) => {
+      setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
+    });
+
+    return () => unsubscribeEmployees();
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
     const q = query(
       collection(db, 'attendance'),
       where('date', '>=', startDate),
@@ -40,10 +59,34 @@ export default function Reports() {
     return () => unsubscribe();
   }, [startDate, endDate]);
 
-  const filteredRecords = records.filter(record => 
-    record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRecords = records.filter(record => {
+    const matchesSearch = record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         record.employeeId.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesEmployee = selectedEmployeeId === 'all' || record.employeeId === selectedEmployeeId;
+    return matchesSearch && matchesEmployee;
+  });
+
+  // Calculate Summary
+  const summary = {
+    total: filteredRecords.filter(r => r.type === 'in').length,
+    late: filteredRecords.filter(r => r.type === 'in' && r.isLate).length,
+    earlyLeave: filteredRecords.filter(r => r.type === 'out' && r.isEarlyLeave).length,
+    onTime: filteredRecords.filter(r => r.type === 'in' && !r.isLate).length
+  };
+
+  const setQuickFilter = (type: 'today' | 'week' | 'month') => {
+    const now = new Date();
+    if (type === 'today') {
+      setStartDate(format(now, 'yyyy-MM-dd'));
+      setEndDate(format(now, 'yyyy-MM-dd'));
+    } else if (type === 'week') {
+      setStartDate(format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+      setEndDate(format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+    } else if (type === 'month') {
+      setStartDate(format(startOfMonth(now), 'yyyy-MM-dd'));
+      setEndDate(format(endOfMonth(now), 'yyyy-MM-dd'));
+    }
+  };
 
   const exportToCSV = () => {
     const headers = ['Nama Pegawai', 'ID Pegawai', 'Tipe', 'Tanggal', 'Waktu', 'Status'];
@@ -71,7 +114,10 @@ export default function Reports() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-stone-900">Laporan Absensi</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-stone-900">Laporan Absensi</h2>
+          <p className="text-stone-500 text-sm">Pantau kehadiran pegawai secara berkala.</p>
+        </div>
         <button
           onClick={exportToCSV}
           className="flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-800 text-white font-semibold py-3 px-6 rounded-2xl transition-all shadow-lg"
@@ -81,9 +127,62 @@ export default function Reports() {
         </button>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
+          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mb-4">
+            <TrendingUp className="w-5 h-5 text-blue-600" />
+          </div>
+          <p className="text-xs font-bold text-stone-500 uppercase tracking-wider">Total Kehadiran</p>
+          <h3 className="text-2xl font-bold text-stone-900 mt-1">{summary.total}</h3>
+        </div>
+        <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
+          <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center mb-4">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+          </div>
+          <p className="text-xs font-bold text-stone-500 uppercase tracking-wider">Tepat Waktu</p>
+          <h3 className="text-2xl font-bold text-stone-900 mt-1">{summary.onTime}</h3>
+        </div>
+        <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
+          <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center mb-4">
+            <AlertCircle className="w-5 h-5 text-red-600" />
+          </div>
+          <p className="text-xs font-bold text-stone-500 uppercase tracking-wider">Terlambat</p>
+          <h3 className="text-2xl font-bold text-stone-900 mt-1">{summary.late}</h3>
+        </div>
+        <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
+          <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center mb-4">
+            <Clock className="w-5 h-5 text-amber-600" />
+          </div>
+          <p className="text-xs font-bold text-stone-500 uppercase tracking-wider">Pulang Awal</p>
+          <h3 className="text-2xl font-bold text-stone-900 mt-1">{summary.earlyLeave}</h3>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="flex flex-wrap gap-2">
+          <button 
+            onClick={() => setQuickFilter('today')}
+            className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold transition-all"
+          >
+            Hari Ini
+          </button>
+          <button 
+            onClick={() => setQuickFilter('week')}
+            className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold transition-all"
+          >
+            Minggu Ini
+          </button>
+          <button 
+            onClick={() => setQuickFilter('month')}
+            className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold transition-all"
+          >
+            Bulan Ini
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="space-y-2">
             <label className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center gap-2">
               <Calendar className="w-3 h-3" />
@@ -110,12 +209,28 @@ export default function Reports() {
           </div>
           <div className="space-y-2">
             <label className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center gap-2">
+              <UserIcon className="w-3 h-3" />
+              Pilih Pegawai
+            </label>
+            <select
+              value={selectedEmployeeId}
+              onChange={(e) => setSelectedEmployeeId(e.target.value)}
+              className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-semibold"
+            >
+              <option value="all">Semua Pegawai</option>
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.employeeId}>{emp.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center gap-2">
               <Search className="w-3 h-3" />
-              Cari Nama / ID
+              Cari Cepat
             </label>
             <input
               type="text"
-              placeholder="Cari..."
+              placeholder="Nama / ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-semibold"
