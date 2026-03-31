@@ -336,8 +336,7 @@ export default function App() {
           
           <button
             onClick={() => {
-              setAttendanceResult(null);
-              setExternalToken(null);
+              window.location.href = 'https://www.google.com';
             }}
             className="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-4 rounded-2xl transition-all shadow-lg"
           >

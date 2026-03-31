@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, onSnapshot, doc, deleteDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay, subDays } from 'date-fns';
-import { FileText, Download, Calendar, Search, Filter, User as UserIcon, Clock, LogIn, LogOut, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay, subDays, parse } from 'date-fns';
+import { FileText, Download, Calendar, Search, Filter, User as UserIcon, Clock, LogIn, LogOut, TrendingUp, AlertCircle, CheckCircle2, Edit2, Trash2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AttendanceRecord {
@@ -31,6 +31,45 @@ export default function Reports() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'history' | 'not-present'>('history');
+  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus data absensi ini?')) return;
+    
+    try {
+      await deleteDoc(doc(db, 'attendance', id));
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      alert('Gagal menghapus data.');
+    }
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRecord) return;
+
+    try {
+      const recordRef = doc(db, 'attendance', editingRecord.id);
+      
+      // If timestamp is edited as string, convert back to Firestore Timestamp
+      // For simplicity, we'll assume the user might want to edit the date and time
+      // But let's just allow editing the type and status for now if we don't want to overcomplicate
+      // Actually, let's allow editing the type and the 'isLate'/'isEarlyLeave' flags
+      
+      await updateDoc(recordRef, {
+        type: editingRecord.type,
+        isLate: editingRecord.isLate || false,
+        isEarlyLeave: editingRecord.isEarlyLeave || false,
+        date: editingRecord.date
+      });
+
+      setEditingRecord(null);
+    } catch (error) {
+      console.error('Error updating record:', error);
+      alert('Gagal memperbarui data.');
+    }
+  };
 
   useEffect(() => {
     // Fetch employees for dropdown and "not present" check
@@ -304,7 +343,8 @@ export default function Reports() {
                     <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">ID Pegawai</th>
                     <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">Tipe</th>
                     <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">Tanggal</th>
-                    <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider text-right">Waktu</th>
+                    <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">Waktu</th>
+                    <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
@@ -341,8 +381,26 @@ export default function Reports() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-stone-600 text-sm">{record.date}</td>
-                        <td className="px-6 py-4 text-right font-mono text-stone-900 font-bold">
+                        <td className="px-6 py-4 font-mono text-stone-900 font-bold">
                           {record.timestamp?.toDate ? format(record.timestamp.toDate(), 'HH:mm:ss') : '--:--'}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => setEditingRecord(record)}
+                              className="p-2 text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              title="Edit"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(record.id)}
+                              className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              title="Hapus"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -403,6 +461,109 @@ export default function Reports() {
           </div>
         </div>
       )}
+
+      {/* Edit Modal */}
+      <AnimatePresence>
+        {editingRecord && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-stone-100 flex items-center justify-between bg-stone-50">
+                <h3 className="text-lg font-bold text-stone-900">Edit Data Absensi</h3>
+                <button 
+                  onClick={() => setEditingRecord(null)}
+                  className="p-2 hover:bg-stone-200 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5 text-stone-500" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdate} className="p-6 space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2 block">Pegawai</label>
+                    <div className="px-4 py-3 bg-stone-100 border border-stone-200 rounded-xl font-semibold text-stone-600">
+                      {editingRecord.employeeName} ({editingRecord.employeeId})
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2 block">Tipe Absensi</label>
+                    <select
+                      value={editingRecord.type}
+                      onChange={(e) => setEditingRecord({ ...editingRecord, type: e.target.value as 'in' | 'out' })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-semibold"
+                    >
+                      <option value="in">Hadir (Masuk)</option>
+                      <option value="out">Pulang (Keluar)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2 block">Tanggal</label>
+                    <input
+                      type="date"
+                      value={editingRecord.date}
+                      onChange={(e) => setEditingRecord({ ...editingRecord, date: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-semibold"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-6 pt-2">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={editingRecord.isLate}
+                          onChange={(e) => setEditingRecord({ ...editingRecord, isLate: e.target.checked })}
+                          className="sr-only"
+                        />
+                        <div className={`w-10 h-6 rounded-full transition-colors ${editingRecord.isLate ? 'bg-red-500' : 'bg-stone-200'}`}></div>
+                        <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${editingRecord.isLate ? 'translate-x-4' : ''}`}></div>
+                      </div>
+                      <span className="text-sm font-bold text-stone-700">Terlambat</span>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={editingRecord.isEarlyLeave}
+                          onChange={(e) => setEditingRecord({ ...editingRecord, isEarlyLeave: e.target.checked })}
+                          className="sr-only"
+                        />
+                        <div className={`w-10 h-6 rounded-full transition-colors ${editingRecord.isEarlyLeave ? 'bg-amber-500' : 'bg-stone-200'}`}></div>
+                        <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${editingRecord.isEarlyLeave ? 'translate-x-4' : ''}`}></div>
+                      </div>
+                      <span className="text-sm font-bold text-stone-700">Pulang Awal</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setEditingRecord(null)}
+                    className="flex-1 px-6 py-3 border border-stone-200 text-stone-600 font-bold rounded-2xl hover:bg-stone-50 transition-all"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-6 py-3 bg-stone-900 text-white font-bold rounded-2xl hover:bg-stone-800 transition-all shadow-lg"
+                  >
+                    Simpan
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

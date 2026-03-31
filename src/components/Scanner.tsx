@@ -267,10 +267,12 @@ export default function Scanner() {
               )}
 
               <button
-                onClick={resetScanner}
+                onClick={() => {
+                  window.location.href = 'https://www.google.com';
+                }}
                 className="mt-8 bg-stone-900 hover:bg-stone-800 text-white font-semibold py-3 px-8 rounded-xl transition-all shadow-lg"
               >
-                Scan Lagi
+                Selesai
               </button>
             </motion.div>
           )}
