@@ -5,6 +5,7 @@ import { db, auth } from '../firebase';
 import { format } from 'date-fns';
 import { CheckCircle2, XCircle, Clock, User as UserIcon, LogIn, LogOut, Camera, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { recordAttendance, AttendanceResult } from '../utils/attendance';
 
 enum OperationType {
   CREATE = 'create',
@@ -144,147 +145,8 @@ export default function Scanner() {
     await stopCamera();
     setIsScanning(false);
     
-    try {
-      let targetEmployeeId = decodedText;
-      let targetEmployeeName = '';
-
-      // Check if it's an Office QR scan by an employee
-      if (decodedText === settings?.officeQrToken) {
-        if (!userProfile?.employeeId) {
-          setScanResult({ success: false, message: 'Akun Anda belum terhubung dengan ID Pegawai.' });
-          return;
-        }
-        targetEmployeeId = userProfile.employeeId;
-        targetEmployeeName = userProfile.employeeName || 'Pegawai';
-      }
-
-      // 1. Find employee by employeeId
-      const employeesRef = collection(db, 'employees');
-      const q = query(employeesRef, where('employeeId', '==', targetEmployeeId));
-      
-      let querySnapshot;
-      try {
-        querySnapshot = await getDocs(q);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, 'employees');
-        return;
-      }
-
-      if (querySnapshot.empty) {
-        setScanResult({ success: false, message: 'Pegawai tidak ditemukan. Silakan hubungi admin.' });
-        return;
-      }
-
-      const employee = querySnapshot.docs[0].data();
-      targetEmployeeName = employee.name;
-      const today = format(new Date(), 'yyyy-MM-dd');
-
-      // 2. Check last attendance for today
-      const attendanceRef = collection(db, 'attendance');
-      const attendanceQuery = query(
-        attendanceRef,
-        where('employeeId', '==', targetEmployeeId),
-        where('date', '==', today)
-      );
-      
-      let attendanceSnapshot;
-      try {
-        attendanceSnapshot = await getDocs(attendanceQuery);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, 'attendance');
-        return;
-      }
-
-      let type: 'in' | 'out' = 'in';
-      if (!attendanceSnapshot.empty) {
-        const docs = attendanceSnapshot.docs.map(d => d.data());
-        docs.sort((a, b) => {
-          const timeA = a.timestamp?.toMillis?.() || 0;
-          const timeB = b.timestamp?.toMillis?.() || 0;
-          return timeB - timeA;
-        });
-        const lastAttendance = docs[0];
-        type = lastAttendance.type === 'in' ? 'out' : 'in';
-      }
-
-      // 3. Calculate Lateness
-      let isLate = false;
-      let isEarlyLeave = false;
-      
-      if (settings) {
-        const now = new Date();
-        const day = now.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
-        const currentTimeStr = format(now, 'HH:mm');
-        
-        let startTime = '';
-        let endTime = '';
-        
-        if (day >= 1 && day <= 4) { // Mon-Thu
-          startTime = settings.workStartTimeMonThu;
-          endTime = settings.workEndTimeMonThu;
-        } else if (day === 5) { // Fri
-          startTime = settings.workStartTimeFri;
-          endTime = settings.workEndTimeFri;
-        }
-        
-        if (startTime && type === 'in') {
-          const [startH, startM] = startTime.split(':').map(Number);
-          const [currH, currM] = currentTimeStr.split(':').map(Number);
-          const startTotal = startH * 60 + startM + (settings.lateThreshold || 0);
-          const currTotal = currH * 60 + currM;
-          if (currTotal > startTotal) {
-            isLate = true;
-          }
-        }
-        
-        if (endTime && type === 'out') {
-          const [endH, endM] = endTime.split(':').map(Number);
-          const [currH, currM] = currentTimeStr.split(':').map(Number);
-          const endTotal = endH * 60 + endM;
-          const currTotal = currH * 60 + currM;
-          if (currTotal < endTotal) {
-            isEarlyLeave = true;
-          }
-        }
-      }
-
-      // 4. Record attendance
-      try {
-        await addDoc(attendanceRef, {
-          employeeId: targetEmployeeId,
-          employeeName: targetEmployeeName,
-          type,
-          timestamp: serverTimestamp(),
-          date: today,
-          method: decodedText === settings?.officeQrToken ? 'self_scan' : 'admin_scan',
-          isLate,
-          isEarlyLeave
-        });
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, 'attendance');
-        return;
-      }
-
-      setScanResult({
-        success: true,
-        message: `Absen ${type === 'in' ? 'Hadir' : 'Pulang'} Berhasil!`,
-        data: { name: targetEmployeeName, type, time: format(new Date(), 'HH:mm:ss'), isLate, isEarlyLeave }
-      });
-
-    } catch (error) {
-      console.error('Attendance error:', error);
-      // Jika error adalah JSON string dari handleFirestoreError, parse pesannya
-      let displayMessage = 'Terjadi kesalahan sistem. Silakan coba lagi.';
-      try {
-        const parsedError = JSON.parse((error as Error).message);
-        if (parsedError.error) {
-          displayMessage = `Kesalahan: ${parsedError.error}`;
-        }
-      } catch (e) {
-        // Bukan JSON, gunakan default
-      }
-      setScanResult({ success: false, message: displayMessage });
-    }
+    const result = await recordAttendance(decodedText, userProfile, settings);
+    setScanResult(result);
   }
 
   const resetScanner = () => {

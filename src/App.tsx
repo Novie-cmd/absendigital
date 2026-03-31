@@ -2,21 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
-import { LogIn, LogOut, LayoutDashboard, Users, Settings as SettingsIcon, FileText, ScanLine, Lock, UserPlus } from 'lucide-react';
+import { LogIn, LogOut, LayoutDashboard, Users, Settings as SettingsIcon, FileText, ScanLine, Lock, UserPlus, CheckCircle2, XCircle, Clock, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Scanner from './components/Scanner';
 import AdminPortal from './components/AdminPortal';
+import { recordAttendance, AttendanceResult } from './utils/attendance';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'scan' | 'admin'>('scan');
   const [linking, setLinking] = useState(false);
   const [linkId, setLinkId] = useState('');
+  const [externalToken, setExternalToken] = useState<string | null>(null);
+  const [attendanceResult, setAttendanceResult] = useState<AttendanceResult | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [settings, setSettings] = useState<any>(null);
 
   useEffect(() => {
+    // Check for external scan token in URL
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+      setExternalToken(token);
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (!currentUser) {
@@ -42,24 +55,44 @@ export default function App() {
       setIsAdmin(true);
     }
 
-    // Fetch user profile from Firestore
-    const fetchProfile = async () => {
+    // Fetch user profile and settings from Firestore
+    const fetchData = async () => {
       try {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
+          setUserProfile(data);
           if (data.role === 'admin') setIsAdmin(true);
           if (data.employeeId) setEmployeeId(data.employeeId);
         }
+
+        const settingsDoc = await getDoc(doc(db, 'settings', 'config'));
+        if (settingsDoc.exists()) setSettings(settingsDoc.data());
       } catch (err) {
-        console.error('Profile fetch error:', err);
+        console.error('Data fetch error:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProfile();
+    fetchData();
   }, [user]);
+
+  const handleExternalAttendance = async () => {
+    if (!user || !externalToken || !settings) return;
+    
+    setIsProcessing(true);
+    try {
+      const result = await recordAttendance(externalToken, userProfile, settings);
+      setAttendanceResult(result);
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (error) {
+      console.error('External attendance error:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleLinkAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,6 +239,100 @@ export default function App() {
             className="w-full mt-4 text-stone-400 text-sm hover:text-stone-600 transition-all"
           >
             Keluar dan gunakan akun lain
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // External Scan View
+  if (externalToken && !attendanceResult) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-stone-50 p-4">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-stone-200"
+        >
+          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em] mb-4">Kesbangpoldagri NTB</p>
+          <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <ScanLine className="w-10 h-10 text-emerald-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-stone-900 mb-2">Konfirmasi Absensi</h1>
+          <p className="text-stone-500 mb-8">Anda akan melakukan Absen, lanjutkan?</p>
+          
+          <div className="space-y-3">
+            <button
+              onClick={handleExternalAttendance}
+              disabled={isProcessing}
+              className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-emerald-200 disabled:opacity-50"
+            >
+              {isProcessing ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : 'Lanjutkan'}
+            </button>
+            <button
+              onClick={() => setExternalToken(null)}
+              disabled={isProcessing}
+              className="w-full text-stone-400 text-sm hover:text-stone-600 transition-all py-2"
+            >
+              Batalkan
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Attendance Result View (from External Scan)
+  if (attendanceResult) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-stone-50 p-4">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-stone-200"
+        >
+          {attendanceResult.success ? (
+            <>
+              <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em] mb-4">Kesbangpoldagri NTB</p>
+              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-stone-900 mb-2">{attendanceResult.message}</h3>
+              <div className="bg-stone-50 rounded-2xl p-6 w-full border border-stone-100 space-y-4 mb-8">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-stone-500">
+                    <UserIcon className="w-4 h-4" />
+                    <span className="text-sm">Nama</span>
+                  </div>
+                  <span className="font-semibold text-stone-900">{attendanceResult.data?.name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-stone-500">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm">Waktu</span>
+                  </div>
+                  <span className="font-semibold text-stone-900">{attendanceResult.data?.time}</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <XCircle className="w-10 h-10 text-red-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-stone-900 mb-2">Gagal Absensi</h3>
+              <p className="text-stone-500 mb-8">{attendanceResult.message}</p>
+            </>
+          )}
+          
+          <button
+            onClick={() => {
+              setAttendanceResult(null);
+              setExternalToken(null);
+            }}
+            className="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-4 rounded-2xl transition-all shadow-lg"
+          >
+            Selesai
           </button>
         </motion.div>
       </div>

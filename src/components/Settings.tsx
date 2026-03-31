@@ -220,7 +220,7 @@ export default function Settings() {
           <div className="bg-white p-6 rounded-3xl border-2 border-stone-100 mb-6">
             <QRCodeSVG
               id="office-qr"
-              value={settings.officeQrToken}
+              value={`${window.location.origin}/?token=${settings.officeQrToken}`}
               size={240}
               level="H"
               includeMargin={true}
@@ -228,7 +228,7 @@ export default function Settings() {
           </div>
           <h4 className="text-xl font-bold text-stone-900 mb-2">QR Absensi Lokasi</h4>
           <p className="text-stone-400 text-sm max-w-xs">
-            Pegawai akan melakukan scan QR ini menggunakan HP mereka masing-masing melalui aplikasi ini.
+            Cetak QR ini. Pegawai dapat melakukan scan menggunakan Google Lens atau kamera HP untuk langsung masuk ke sistem absensi.
           </p>
           <button
             onClick={downloadOfficeQR}
