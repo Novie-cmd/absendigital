@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 interface Employee {
   id: string;
   name: string;
+  email?: string;
   employeeId: string;
   department: string;
   position: string;
@@ -22,6 +23,7 @@ export default function EmployeeManagement() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    email: '',
     employeeId: '',
     department: '',
     position: ''
@@ -57,13 +59,14 @@ export default function EmployeeManagement() {
       setSelectedEmployee(employee);
       setFormData({
         name: employee.name,
+        email: employee.email || '',
         employeeId: employee.employeeId,
         department: employee.department,
         position: employee.position
       });
     } else {
       setSelectedEmployee(null);
-      setFormData({ name: '', employeeId: '', department: '', position: '' });
+      setFormData({ name: '', email: '', employeeId: '', department: '', position: '' });
     }
     setIsModalOpen(true);
   };
@@ -160,6 +163,7 @@ export default function EmployeeManagement() {
             <thead>
               <tr className="bg-stone-50 border-b border-stone-200">
                 <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">Pegawai</th>
+                <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">Email</th>
                 <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">ID Pegawai</th>
                 <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">Departemen</th>
                 <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">Jabatan</th>
@@ -168,11 +172,11 @@ export default function EmployeeManagement() {
             </thead>
             <tbody className="divide-y divide-stone-100">
               {loading ? (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-stone-400">Memuat data...</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-stone-400">Memuat data...</td></tr>
               ) : error ? (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-red-500 font-medium">{error}</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-red-500 font-medium">{error}</td></tr>
               ) : filteredEmployees.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-stone-400">Tidak ada data pegawai.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-stone-400">Tidak ada data pegawai.</td></tr>
               ) : (
                 filteredEmployees.map((emp) => (
                   <tr key={emp.id} className="hover:bg-stone-50 transition-colors group">
@@ -184,6 +188,7 @@ export default function EmployeeManagement() {
                         <span className="font-bold text-stone-900">{emp.name}</span>
                       </div>
                     </td>
+                    <td className="px-6 py-4 text-stone-500 text-sm">{emp.email || '-'}</td>
                     <td className="px-6 py-4 text-stone-600 font-mono text-sm">{emp.employeeId}</td>
                     <td className="px-6 py-4 text-stone-600">{emp.department}</td>
                     <td className="px-6 py-4 text-stone-600">{emp.position}</td>
@@ -247,6 +252,16 @@ export default function EmployeeManagement() {
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-stone-700 mb-1">Email (Opsional untuk Auto-Link)</label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="email@example.com"
                       className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     />
                   </div>

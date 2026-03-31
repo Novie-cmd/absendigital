@@ -26,7 +26,8 @@ export interface AttendanceResult {
 export async function recordAttendance(
   decodedText: string,
   userProfile: any,
-  settings: any
+  settings: any,
+  userEmail?: string | null
 ): Promise<AttendanceResult> {
   try {
     let targetEmployeeId = decodedText;
@@ -34,11 +35,24 @@ export async function recordAttendance(
 
     // Check if it's an Office QR scan by an employee
     if (decodedText === settings?.officeQrToken) {
-      if (!userProfile?.employeeId) {
-        return { success: false, message: 'Akun Anda belum terhubung dengan ID Pegawai.' };
+      let currentEmployeeId = userProfile?.employeeId;
+
+      // Fallback: Try to find employee by email if ID is missing (common for admins)
+      if (!currentEmployeeId && userEmail) {
+        const employeesRef = collection(db, 'employees');
+        const qEmail = query(employeesRef, where('email', '==', userEmail.toLowerCase().trim()));
+        const emailSnap = await getDocs(qEmail);
+        if (!emailSnap.empty) {
+          const empData = emailSnap.docs[0].data();
+          currentEmployeeId = empData.employeeId;
+        }
       }
-      targetEmployeeId = userProfile.employeeId;
-      targetEmployeeName = userProfile.employeeName || 'Pegawai';
+
+      if (!currentEmployeeId) {
+        return { success: false, message: 'Akun Anda belum terhubung dengan ID Pegawai. Silakan hubungi admin atau hubungkan ID Anda di profil.' };
+      }
+      targetEmployeeId = currentEmployeeId;
+      targetEmployeeName = userProfile?.employeeName || '';
     }
 
     // 1. Find employee by employeeId

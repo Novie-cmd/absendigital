@@ -83,7 +83,7 @@ export default function App() {
     
     setIsProcessing(true);
     try {
-      const result = await recordAttendance(externalToken, userProfile, settings);
+      const result = await recordAttendance(externalToken, userProfile, settings, user.email);
       setAttendanceResult(result);
       // Clear URL params
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -194,7 +194,7 @@ export default function App() {
     );
   }
 
-  if (!isAdmin && !employeeId) {
+  if (!employeeId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-stone-50 p-4">
         <motion.div 
@@ -233,6 +233,15 @@ export default function App() {
               {linking ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : 'Hubungkan Sekarang'}
             </button>
           </form>
+
+          {isAdmin && (
+            <button
+              onClick={() => setEmployeeId('ADMIN_TEMP')}
+              className="w-full mt-4 text-emerald-600 text-sm font-bold hover:text-emerald-700 transition-all py-2 border border-emerald-100 rounded-xl"
+            >
+              Lewati ke Portal Admin
+            </button>
+          )}
 
           <button
             onClick={handleLogout}

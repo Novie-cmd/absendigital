@@ -145,7 +145,7 @@ export default function Scanner() {
     await stopCamera();
     setIsScanning(false);
     
-    const result = await recordAttendance(decodedText, userProfile, settings);
+    const result = await recordAttendance(decodedText, userProfile, settings, auth.currentUser?.email);
     setScanResult(result);
   }
 
