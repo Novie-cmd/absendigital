@@ -45,6 +45,7 @@ export async function recordAttendance(
         if (!emailSnap.empty) {
           const empData = emailSnap.docs[0].data();
           currentEmployeeId = empData.employeeId;
+          targetEmployeeName = empData.name; // Use name from employee record
         }
       }
 
@@ -52,7 +53,9 @@ export async function recordAttendance(
         return { success: false, message: 'Akun Anda belum terhubung dengan ID Pegawai. Silakan hubungi admin atau hubungkan ID Anda di profil.' };
       }
       targetEmployeeId = currentEmployeeId;
-      targetEmployeeName = userProfile?.employeeName || '';
+      if (!targetEmployeeName) {
+        targetEmployeeName = userProfile?.employeeName || '';
+      }
     }
 
     // 1. Find employee by employeeId

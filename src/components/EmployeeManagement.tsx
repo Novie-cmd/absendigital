@@ -77,11 +77,16 @@ export default function EmployeeManagement() {
     e.preventDefault();
     setSaving(true);
     try {
+      const normalizedData = {
+        ...formData,
+        email: formData.email.toLowerCase().trim()
+      };
+
       if (selectedEmployee) {
-        await updateDoc(doc(db, 'employees', selectedEmployee.id), formData);
+        await updateDoc(doc(db, 'employees', selectedEmployee.id), normalizedData);
       } else {
         await addDoc(collection(db, 'employees'), {
-          ...formData,
+          ...normalizedData,
           createdAt: serverTimestamp()
         });
       }

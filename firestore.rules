@@ -43,7 +43,11 @@ service cloud.firestore {
 
     function isValidEmployee(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.employeeId is string && data.employeeId.size() > 0 && data.employeeId.size() < 50;
+             data.employeeId is string && data.employeeId.size() > 0 && data.employeeId.size() < 50 &&
+             (!('email' in data) || (data.email is string && data.email.size() < 100)) &&
+             (!('department' in data) || (data.department is string && data.department.size() < 100)) &&
+             (!('position' in data) || (data.position is string && data.position.size() < 100)) &&
+             (!('createdAt' in data) || (data.createdAt is timestamp || data.createdAt == null));
     }
 
     function isValidAttendance(data) {
@@ -64,7 +68,9 @@ service cloud.firestore {
     function isValidUser(data) {
       return data.email is string && data.name is string &&
              (data.role in ['admin', 'employee']) &&
-             (!('employeeId' in data) || (data.employeeId is string && data.employeeId.size() < 50));
+             (!('employeeId' in data) || (data.employeeId is string && data.employeeId.size() < 50)) &&
+             (!('employeeName' in data) || (data.employeeName is string && data.employeeName.size() < 100)) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp || data.updatedAt == null));
     }
 
     // ===============================================================
