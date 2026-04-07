@@ -106,6 +106,7 @@ export default function EmployeeManagement() {
 
   const filteredEmployees = employees.filter(emp => 
     emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (emp.email && emp.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
     emp.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.department.toLowerCase().includes(searchTerm.toLowerCase())
   );
