@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
-import { LogIn, LogOut, LayoutDashboard, Users, Settings as SettingsIcon, FileText, ScanLine, Lock, UserPlus, CheckCircle2, XCircle, Clock, User as UserIcon } from 'lucide-react';
+import { LogIn, LogOut, LayoutDashboard, Users, Settings as SettingsIcon, FileText, ScanLine, Lock, UserPlus, CheckCircle2, XCircle, Clock, User as UserIcon, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Scanner from './components/Scanner';
 import AdminPortal from './components/AdminPortal';
@@ -59,11 +59,36 @@ export default function App() {
     const fetchData = async () => {
       try {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
+        let currentProfile = null;
+
         if (userDoc.exists()) {
-          const data = userDoc.data();
-          setUserProfile(data);
-          if (data.role === 'admin') setIsAdmin(true);
-          if (data.employeeId) setEmployeeId(data.employeeId);
+          currentProfile = userDoc.data();
+          setUserProfile(currentProfile);
+          if (currentProfile.role === 'admin') setIsAdmin(true);
+          if (currentProfile.employeeId) setEmployeeId(currentProfile.employeeId);
+        } else {
+          // SEAMLESS AUTO-LINK: Check if email exists in employees collection
+          const employeesRef = collection(db, 'employees');
+          const q = query(employeesRef, where('email', '==', userEmail));
+          const snap = await getDocs(q);
+          
+          if (!snap.empty) {
+            const employeeData = snap.docs[0].data();
+            const newProfile = {
+              email: user.email,
+              name: user.displayName,
+              employeeId: employeeData.employeeId,
+              employeeName: employeeData.name,
+              role: userEmail === adminEmail ? 'admin' : 'employee',
+              updatedAt: serverTimestamp()
+            };
+            
+            await setDoc(doc(db, 'users', user.uid), newProfile);
+            setUserProfile(newProfile);
+            setEmployeeId(employeeData.employeeId);
+            if (newProfile.role === 'admin') setIsAdmin(true);
+            console.log('Seamlessly linked account for:', employeeData.name);
+          }
         }
 
         const settingsDoc = await getDoc(doc(db, 'settings', 'config'));
@@ -209,8 +234,15 @@ export default function App() {
             </div>
             <h1 className="text-2xl font-bold text-stone-900">Hubungkan Akun</h1>
             <p className="text-stone-500 text-sm mt-2">
-              Masukkan ID Pegawai Anda untuk menghubungkan akun Google ini dengan data kehadiran Anda.
+              Email Anda (<span className="font-semibold text-stone-700">{user.email}</span>) belum terdaftar secara otomatis. 
+              Silakan masukkan ID Pegawai Anda untuk menghubungkan akun.
             </p>
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-xl text-[11px] text-amber-700 text-left">
+              <p className="font-bold mb-1 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" /> Tips:
+              </p>
+              Minta Admin untuk mendaftarkan email Anda di Data Pegawai agar proses ini menjadi otomatis di masa mendatang.
+            </div>
           </div>
 
           <form onSubmit={handleLinkAccount} className="space-y-4">

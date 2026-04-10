@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Plus, Search, Edit2, Trash2, QrCode, X, Save, UserPlus, Download } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, QrCode, X, Save, UserPlus, Download, CheckCircle2, Clock } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'motion/react';
+import { recordAttendance, AttendanceResult } from '../utils/attendance';
 
 interface Employee {
   id: string;
@@ -30,6 +31,35 @@ export default function EmployeeManagement() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [manualResult, setManualResult] = useState<AttendanceResult | null>(null);
+  const [isRecording, setIsRecording] = useState<string | null>(null);
+  const [settings, setSettings] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const settingsDoc = await getDoc(doc(db, 'settings', 'config'));
+      if (settingsDoc.exists()) setSettings(settingsDoc.data());
+    };
+    fetchSettings();
+  }, []);
+
+  const handleManualAttendance = async (employee: Employee) => {
+    if (!window.confirm(`Catat absensi manual untuk ${employee.name}?`)) return;
+    
+    setIsRecording(employee.id);
+    try {
+      // For manual admin attendance, we pass the employeeId as the decodedText
+      // and null for userProfile/userEmail since the admin is doing it for them
+      const result = await recordAttendance(employee.employeeId, null, settings, null);
+      setManualResult(result);
+      setTimeout(() => setManualResult(null), 3000);
+    } catch (err) {
+      console.error('Manual attendance error:', err);
+      alert('Gagal mencatat absensi manual.');
+    } finally {
+      setIsRecording(null);
+    }
+  };
 
   useEffect(() => {
     console.log('EmployeeManagement: Checking data...');
@@ -201,6 +231,18 @@ export default function EmployeeManagement() {
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
+                          onClick={() => handleManualAttendance(emp)}
+                          disabled={isRecording === emp.id}
+                          className="p-2 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
+                          title="Absen Manual"
+                        >
+                          {isRecording === emp.id ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-600"></div>
+                          ) : (
+                            <Clock className="w-5 h-5" />
+                          )}
+                        </button>
+                        <button
                           onClick={() => { setSelectedEmployee(emp); setIsQRModalOpen(true); }}
                           className="p-2 text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
                           title="Lihat QR Code"
@@ -370,6 +412,30 @@ export default function EmployeeManagement() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Manual Attendance Result Toast */}
+      <AnimatePresence>
+        {manualResult && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-8 right-8 z-[200]"
+          >
+            <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${
+              manualResult.success ? 'bg-emerald-600 border-emerald-500' : 'bg-red-600 border-red-500'
+            } text-white`}>
+              {manualResult.success ? <CheckCircle2 className="w-6 h-6" /> : <X className="w-6 h-6" />}
+              <div>
+                <p className="font-bold">{manualResult.message}</p>
+                {manualResult.data && (
+                  <p className="text-xs opacity-90">{manualResult.data.name} - {manualResult.data.time}</p>
+                )}
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
