@@ -83,11 +83,17 @@ export default function App() {
               updatedAt: serverTimestamp()
             };
             
-            await setDoc(doc(db, 'users', user.uid), newProfile);
-            setUserProfile(newProfile);
-            setEmployeeId(employeeData.employeeId);
-            if (newProfile.role === 'admin') setIsAdmin(true);
-            console.log('Seamlessly linked account for:', employeeData.name);
+            console.log('Attempting seamless link for UID:', user.uid);
+            try {
+              await setDoc(doc(db, 'users', user.uid), newProfile);
+              setUserProfile(newProfile);
+              setEmployeeId(employeeData.employeeId);
+              if (newProfile.role === 'admin') setIsAdmin(true);
+              console.log('Seamlessly linked account for:', employeeData.name);
+            } catch (err: any) {
+              console.error('Error during seamless link:', err);
+              // Don't throw here, just let the user try manual link
+            }
           }
         }
 
@@ -126,26 +132,38 @@ export default function App() {
     setLinking(true);
     try {
       // 1. Verify if employeeId exists in employees collection
-      const employeesRef = collection(db, 'employees');
-      const q = query(employeesRef, where('employeeId', '==', linkId.trim()));
-      const snap = await getDocs(q);
-      
-      if (snap.empty) {
-        alert('ID Pegawai tidak ditemukan. Silakan hubungi admin untuk mendaftarkan ID Anda.');
-        return;
+      let employeeData;
+      try {
+        const employeesRef = collection(db, 'employees');
+        const q = query(employeesRef, where('employeeId', '==', linkId.trim()));
+        const snap = await getDocs(q);
+        
+        if (snap.empty) {
+          alert('ID Pegawai tidak ditemukan. Silakan hubungi admin untuk mendaftarkan ID Anda.');
+          setLinking(false);
+          return;
+        }
+        employeeData = snap.docs[0].data();
+      } catch (err: any) {
+        console.error('Error querying employees:', err);
+        throw new Error('Gagal memverifikasi ID Pegawai: ' + err.message);
       }
 
-      const employeeData = snap.docs[0].data();
-
       // 2. Link to user document
-      await setDoc(doc(db, 'users', user.uid), {
-        email: user.email,
-        name: user.displayName,
-        employeeId: linkId.trim(),
-        employeeName: employeeData.name,
-        role: 'employee',
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+      try {
+        console.log('Attempting to link account for UID:', user.uid);
+        await setDoc(doc(db, 'users', user.uid), {
+          email: user.email,
+          name: user.displayName,
+          employeeId: linkId.trim(),
+          employeeName: employeeData.name,
+          role: 'employee',
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (err: any) {
+        console.error('Error setting user doc:', err);
+        throw new Error('Gagal menyimpan profil pengguna: ' + err.message);
+      }
 
       setEmployeeId(linkId.trim());
       alert(`Berhasil menghubungkan akun dengan ${employeeData.name}!`);

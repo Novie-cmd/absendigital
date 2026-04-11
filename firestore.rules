@@ -38,7 +38,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (request.auth.token.email.lower() == "noviharyanto062@gmail.com");
+        'email' in request.auth.token &&
+        request.auth.token.email.lower() == "noviharyanto062@gmail.com";
     }
 
     function isValidEmployee(data) {
@@ -66,11 +67,8 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return data.email is string && data.name is string &&
-             (data.role in ['admin', 'employee']) &&
-             (!('employeeId' in data) || (data.employeeId is string && data.employeeId.size() < 50)) &&
-             (!('employeeName' in data) || (data.employeeName is string && data.employeeName.size() < 100)) &&
-             (!('updatedAt' in data) || (data.updatedAt is timestamp || data.updatedAt == null));
+      return data.email is string && 
+             (!('role' in data) || (data.role in ['admin', 'employee']));
     }
 
     // ===============================================================
@@ -78,9 +76,8 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow create, update: if isAuthenticated() && (request.auth.uid == userId) && isValidUser(request.resource.data);
-      allow delete: if isAdmin();
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read, delete: if isAdmin();
     }
 
     match /employees/{employeeId} {
