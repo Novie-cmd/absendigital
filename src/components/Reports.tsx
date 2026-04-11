@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, orderBy, onSnapshot, doc, deleteDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay, subDays, parse } from 'date-fns';
-import { FileText, Download, Calendar, Search, Filter, User as UserIcon, Clock, LogIn, LogOut, TrendingUp, AlertCircle, CheckCircle2, Edit2, Trash2, X } from 'lucide-react';
+import { id } from 'date-fns/locale';
+import { FileText, Download, Calendar, Search, Filter, User as UserIcon, Clock, LogIn, LogOut, TrendingUp, AlertCircle, CheckCircle2, Edit2, Trash2, X, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AttendanceRecord {
@@ -181,6 +182,135 @@ export default function Reports() {
     }
   };
 
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const title = viewMode === 'history' 
+      ? `Laporan Absensi (${format(parse(startDate, 'yyyy-MM-dd', new Date()), 'dd MMM yyyy', { locale: id })} - ${format(parse(endDate, 'yyyy-MM-dd', new Date()), 'dd MMM yyyy', { locale: id })})`
+      : `Daftar Pegawai Belum Absen (${format(new Date(), 'dd MMMM yyyy', { locale: id })})`;
+
+    const content = `
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; color: #333; }
+            h1 { text-align: center; margin-bottom: 10px; font-size: 24px; }
+            h2 { text-align: center; margin-bottom: 30px; font-size: 16px; color: #666; font-weight: normal; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 12px 8px; text-align: left; font-size: 12px; }
+            th { background-color: #f8f9fa; font-weight: bold; }
+            .summary { display: flex; justify-content: space-around; margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; }
+            .summary-item { text-align: center; }
+            .summary-label { font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 5px; }
+            .summary-value { font-size: 20px; font-weight: bold; }
+            .status-tag { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+            .status-late { color: #dc2626; }
+            .status-early { color: #d97706; }
+            .footer { margin-top: 50px; text-align: right; font-size: 12px; }
+            @media print {
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>KESBANGPOLDAGRI NTB</h1>
+          <h2>${title}</h2>
+          
+          ${viewMode === 'history' ? `
+            <div class="summary">
+              <div class="summary-item">
+                <div class="summary-label">Total Kehadiran</div>
+                <div class="summary-value">${summary.total}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Tepat Waktu</div>
+                <div class="summary-value">${summary.onTime}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Terlambat</div>
+                <div class="summary-value">${summary.late}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Pulang Awal</div>
+                <div class="summary-value">${summary.earlyLeave}</div>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Nama Pegawai</th>
+                  <th>ID Pegawai</th>
+                  <th>Tipe</th>
+                  <th>Tanggal</th>
+                  <th>Waktu</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredRecords.map((r, i) => `
+                  <tr>
+                    <td>${i + 1}</td>
+                    <td>${r.employeeName}</td>
+                    <td>${r.employeeId}</td>
+                    <td>${r.type === 'in' ? 'Hadir' : 'Pulang'}</td>
+                    <td>${r.date}</td>
+                    <td>${r.timestamp?.toDate ? format(r.timestamp.toDate(), 'HH:mm:ss') : '--:--'}</td>
+                    <td>
+                      ${r.isLate ? '<span class="status-late">Terlambat</span>' : ''}
+                      ${r.isEarlyLeave ? '<span class="status-early">Pulang Awal</span>' : ''}
+                      ${!r.isLate && !r.isEarlyLeave ? 'Tepat Waktu' : ''}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : `
+            <table>
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Nama Pegawai</th>
+                  <th>ID Pegawai</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${notPresentToday.map((emp, i) => `
+                  <tr>
+                    <td>${i + 1}</td>
+                    <td>${emp.name}</td>
+                    <td>${emp.employeeId}</td>
+                    <td>Belum Absen</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `}
+          
+          <div class="footer">
+            <p>Dicetak pada: ${format(new Date(), 'dd MMMM yyyy HH:mm', { locale: id })}</p>
+            <br><br><br>
+            <p>__________________________</p>
+            <p>Admin Kesbangpoldagri</p>
+          </div>
+          
+          <script>
+            window.onload = () => {
+              window.print();
+              window.onafterprint = () => window.close();
+            }
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(content);
+    printWindow.document.close();
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -208,6 +338,13 @@ export default function Reports() {
                 Lihat Riwayat
               </>
             )}
+          </button>
+          <button
+            onClick={handlePrint}
+            className="flex items-center justify-center gap-2 bg-white text-stone-700 border border-stone-200 hover:bg-stone-50 font-semibold py-3 px-6 rounded-2xl transition-all shadow-lg"
+          >
+            <Printer className="w-5 h-5" />
+            Cetak
           </button>
           <button
             onClick={exportToCSV}
@@ -418,7 +555,7 @@ export default function Reports() {
             </div>
             <div>
               <h3 className="text-lg font-bold text-red-900">Pegawai Belum Absen</h3>
-              <p className="text-red-700 text-sm">Daftar pegawai yang belum melakukan absensi masuk hari ini ({format(new Date(), 'dd MMMM yyyy')}).</p>
+              <p className="text-red-700 text-sm">Daftar pegawai yang belum melakukan absensi masuk hari ini ({format(new Date(), 'dd MMMM yyyy', { locale: id })}).</p>
             </div>
           </div>
 

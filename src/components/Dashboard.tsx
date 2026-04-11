@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { id } from 'date-fns/locale';
 import { Users, UserCheck, UserMinus, Clock, TrendingUp, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { motion } from 'motion/react';
@@ -81,7 +82,7 @@ export default function Dashboard() {
           const snapshot = await getDocs(q);
           const uniquePresent = new Set(snapshot.docs.map(doc => doc.data().employeeId)).size;
           return {
-            name: format(date, 'EEE'),
+            name: format(date, 'EEE', { locale: id }),
             present: uniquePresent,
             date: dateStr
           };
@@ -136,7 +137,7 @@ export default function Dashboard() {
         <h2 className="text-2xl font-bold text-stone-900">Dashboard Ringkasan</h2>
         <div className="flex items-center gap-2 text-stone-500 text-sm bg-white px-4 py-2 rounded-xl border border-stone-200">
           <Clock className="w-4 h-4" />
-          {format(new Date(), 'dd MMMM yyyy')}
+          {format(new Date(), 'dd MMMM yyyy', { locale: id })}
         </div>
       </div>
 
@@ -188,7 +189,11 @@ export default function Dashboard() {
                 />
                 <Bar dataKey="present" radius={[6, 6, 0, 0]} barSize={40}>
                   {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 6 ? '#10b981' : '#e2e8f0'} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={index === 6 ? '#059669' : '#10b981'} 
+                      fillOpacity={index === 6 ? 1 : 0.6}
+                    />
                   ))}
                 </Bar>
               </BarChart>
