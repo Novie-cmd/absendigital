@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Clock, Save, AlertCircle, CheckCircle2, QrCode, Download } from 'lucide-react';
+import { Clock, Save, AlertCircle, CheckCircle2, QrCode, Download, MapPin, Navigation } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -12,7 +12,11 @@ export default function Settings() {
     workStartTimeFri: '08:00',
     workEndTimeFri: '16:30',
     lateThreshold: 15,
-    officeQrToken: 'OFFICE_ATTENDANCE_TOKEN_123'
+    officeQrToken: 'OFFICE_ATTENDANCE_TOKEN_123',
+    officeLat: 0,
+    officeLng: 0,
+    officeRadius: 100,
+    useGeofencing: false
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +74,28 @@ export default function Settings() {
       };
       img.src = "data:image/svg+xml;base64," + btoa(svgData);
     }
+  };
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation tidak didukung oleh browser Anda.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setSettings({
+          ...settings,
+          officeLat: position.coords.latitude,
+          officeLng: position.coords.longitude
+        });
+        alert("Lokasi berhasil diambil!");
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        alert("Gagal mengambil lokasi. Pastikan izin lokasi diberikan.");
+      }
+    );
   };
 
   if (loading) return <div className="animate-pulse space-y-8">...</div>;
@@ -175,6 +201,79 @@ export default function Settings() {
               />
               <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400 font-bold">Menit</span>
             </div>
+          </div>
+
+          <div className="space-y-6 pt-4 border-t border-stone-100">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-stone-900">Pembatasan Lokasi (Geofencing)</h3>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={settings.useGeofencing}
+                  onChange={(e) => setSettings({ ...settings, useGeofencing: e.target.checked })}
+                  className="sr-only peer" 
+                />
+                <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+              </label>
+            </div>
+
+            {settings.useGeofencing && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="space-y-6"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Latitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={settings.officeLat}
+                      onChange={(e) => setSettings({ ...settings, officeLat: parseFloat(e.target.value) })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl font-mono text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Longitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={settings.officeLng}
+                      onChange={(e) => setSettings({ ...settings, officeLng: parseFloat(e.target.value) })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl font-mono text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Radius Jangkauan (Meter)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="10"
+                      max="1000"
+                      value={settings.officeRadius}
+                      onChange={(e) => setSettings({ ...settings, officeRadius: parseInt(e.target.value) })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl font-bold"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 text-xs">Meter</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={getCurrentLocation}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-100 transition-all"
+                >
+                  <Navigation className="w-4 h-4" />
+                  Gunakan Lokasi Saya Saat Ini
+                </button>
+                <p className="text-[10px] text-stone-400 italic">
+                  *Klik tombol di atas saat Anda berada di titik tengah kantor untuk mengatur koordinat secara otomatis.
+                </p>
+              </motion.div>
+            )}
           </div>
 
           <AnimatePresence>

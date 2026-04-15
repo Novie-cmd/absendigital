@@ -1,5 +1,5 @@
 {
   "name": "Sistem Absensi Barcode Pegawai",
   "description": "Aplikasi absensi pegawai menggunakan sistem barcode/QR code dengan portal admin untuk manajemen data, pengaturan waktu, dan laporan.",
-  "requestFramePermissions": ["camera"]
+  "requestFramePermissions": ["camera", "geolocation"]
 }

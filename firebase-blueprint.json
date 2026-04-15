@@ -38,7 +38,11 @@
         "workStartTimeFri": { "type": "string", "description": "HH:mm (Friday)" },
         "workEndTimeFri": { "type": "string", "description": "HH:mm (Friday)" },
         "lateThreshold": { "type": "integer", "description": "Minutes after start time to be considered late" },
-        "officeQrToken": { "type": "string", "description": "Token for office QR code" }
+        "officeQrToken": { "type": "string", "description": "Token for office QR code" },
+        "officeLat": { "type": "number", "description": "Office latitude" },
+        "officeLng": { "type": "number", "description": "Office longitude" },
+        "officeRadius": { "type": "integer", "description": "Allowed radius in meters" },
+        "useGeofencing": { "type": "boolean", "description": "Whether to enforce location check" }
       }
     },
     "User": {

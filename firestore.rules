@@ -63,7 +63,11 @@ service cloud.firestore {
              data.workEndTimeMonThu is string && data.workEndTimeMonThu.matches("^\\d{2}:\\d{2}$") &&
              data.workStartTimeFri is string && data.workStartTimeFri.matches("^\\d{2}:\\d{2}$") &&
              data.workEndTimeFri is string && data.workEndTimeFri.matches("^\\d{2}:\\d{2}$") &&
-             data.lateThreshold is number;
+             data.lateThreshold is number &&
+             (!('useGeofencing' in data) || data.useGeofencing is bool) &&
+             (!('officeLat' in data) || data.officeLat is number) &&
+             (!('officeLng' in data) || data.officeLng is number) &&
+             (!('officeRadius' in data) || data.officeRadius is number);
     }
 
     function isValidUser(data) {

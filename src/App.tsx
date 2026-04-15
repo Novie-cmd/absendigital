@@ -114,7 +114,29 @@ export default function App() {
     
     setIsProcessing(true);
     try {
-      const result = await recordAttendance(externalToken, userProfile, settings, user.email);
+      let userLocation = null;
+      
+      // Only request location if geofencing is enabled
+      if (settings.useGeofencing) {
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 5000,
+              maximumAge: 0
+            });
+          });
+          userLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+        } catch (locErr) {
+          console.error('Location error:', locErr);
+          // We'll pass null and let recordAttendance handle the error if geofencing is required
+        }
+      }
+
+      const result = await recordAttendance(externalToken, userProfile, settings, user.email, userLocation);
       setAttendanceResult(result);
       // Clear URL params
       window.history.replaceState({}, document.title, window.location.pathname);

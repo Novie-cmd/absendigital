@@ -23,11 +23,28 @@ export interface AttendanceResult {
   };
 }
 
+// Helper to calculate distance between two points in meters (Haversine formula)
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3; // Earth radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
 export async function recordAttendance(
   decodedText: string,
   userProfile: any,
   settings: any,
-  userEmail?: string | null
+  userEmail?: string | null,
+  userLocation?: { lat: number; lng: number } | null
 ): Promise<AttendanceResult> {
   try {
     let targetEmployeeId = decodedText;
@@ -35,6 +52,26 @@ export async function recordAttendance(
 
     // Check if it's an Office QR scan by an employee
     if (decodedText === settings?.officeQrToken) {
+      // 0. Check Location if Geofencing is enabled
+      if (settings?.useGeofencing && settings?.officeLat && settings?.officeLng) {
+        if (!userLocation) {
+          return { success: false, message: 'Gagal mendapatkan lokasi Anda. Pastikan izin lokasi aktif.' };
+        }
+
+        const distance = calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          settings.officeLat,
+          settings.officeLng
+        );
+
+        if (distance > (settings.officeRadius || 100)) {
+          return { 
+            success: false, 
+            message: `Anda berada di luar jangkauan kantor (${Math.round(distance)}m). Silakan mendekat ke kantor untuk melakukan absensi.` 
+          };
+        }
+      }
       let currentEmployeeId = userProfile?.employeeId;
 
       // Fallback: Try to find employee by email if ID is missing (common for admins)

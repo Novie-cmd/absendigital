@@ -145,7 +145,26 @@ export default function Scanner() {
     await stopCamera();
     setIsScanning(false);
     
-    const result = await recordAttendance(decodedText, userProfile, settings, auth.currentUser?.email);
+    let userLocation = null;
+    if (settings?.useGeofencing) {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+          });
+        });
+        userLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+      } catch (locErr) {
+        console.error('Location error:', locErr);
+      }
+    }
+
+    const result = await recordAttendance(decodedText, userProfile, settings, auth.currentUser?.email, userLocation);
     setScanResult(result);
   }
 
