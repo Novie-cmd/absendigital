@@ -107,12 +107,21 @@ export default function Reports() {
       collection(db, 'attendance'),
       where('date', '>=', startDate),
       where('date', '<=', endDate),
-      orderBy('date', 'desc'),
-      orderBy('timestamp', 'desc')
+      orderBy('date', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceRecord)));
+      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceRecord));
+      // Sort in memory by date (desc) and then timestamp (desc)
+      fetched.sort((a, b) => {
+        if (a.date !== b.date) {
+          return b.date.localeCompare(a.date);
+        }
+        const timeA = a.timestamp?.toMillis?.() || (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
+        const timeB = b.timestamp?.toMillis?.() || (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
+        return timeB - timeA;
+      });
+      setRecords(fetched);
       setLoading(false);
     });
 
