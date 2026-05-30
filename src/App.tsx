@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import Scanner from './components/Scanner';
 import AdminPortal from './components/AdminPortal';
 import { recordAttendance, AttendanceResult } from './utils/attendance';
+import { setGoogleToken } from './utils/googleSheets';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -199,8 +200,15 @@ export default function App() {
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+    provider.addScope('https://www.googleapis.com/auth/drive.file');
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setGoogleToken(credential.accessToken);
+        console.log('Saved Google token on login');
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       let message = 'Gagal masuk dengan Google.';
@@ -220,6 +228,7 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      setGoogleToken(null);
     } catch (error) {
       console.error('Logout error:', error);
     }

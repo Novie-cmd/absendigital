@@ -1,6 +1,7 @@
 import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format } from 'date-fns';
+import { getGoogleToken, appendAttendanceToSheet } from './googleSheets';
 
 export enum OperationType {
   CREATE = 'create',
@@ -173,16 +174,42 @@ export async function recordAttendance(
     }
 
     // 4. Record attendance
+    const methodVal = decodedText === settings?.officeQrToken ? 'self_scan' : 'admin_scan';
     await addDoc(attendanceRef, {
       employeeId: targetEmployeeId,
       employeeName: targetEmployeeName,
       type,
       timestamp: serverTimestamp(),
       date: today,
-      method: decodedText === settings?.officeQrToken ? 'self_scan' : 'admin_scan',
+      method: methodVal,
       isLate,
       isEarlyLeave
     });
+
+    // Real-time Sync to Google Sheets
+    if (settings?.useGoogleSheets && settings?.spreadsheetId) {
+      const gToken = getGoogleToken();
+      if (gToken) {
+        try {
+          const currentTimeStr = format(new Date(), 'HH:mm:ss');
+          await appendAttendanceToSheet(gToken, settings.spreadsheetId, {
+            date: today,
+            time: currentTimeStr,
+            employeeId: targetEmployeeId,
+            employeeName: targetEmployeeName,
+            type,
+            method: methodVal,
+            isLate,
+            isEarlyLeave
+          });
+          console.log("Automatically synced attendance to Google Sheets");
+        } catch (err) {
+          console.error("Gagal melakukan sinkronisasi real-time ke Google Sheets:", err);
+        }
+      } else {
+        console.warn("Sinkronisasi otomatis aktif, namun Google Token tidak tersedia di memori.");
+      }
+    }
 
     return {
       success: true,

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
-import { Clock, Save, AlertCircle, CheckCircle2, QrCode, Download, MapPin, Navigation } from 'lucide-react';
+import { db, auth } from '../firebase';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { Clock, Save, AlertCircle, CheckCircle2, QrCode, Download, MapPin, Navigation, FileText, ExternalLink, Database, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
+import { getGoogleToken, setGoogleToken, createSpreadsheet, verifySpreadsheetAccess } from '../utils/googleSheets';
 
 export default function Settings() {
   const [settings, setSettings] = useState({
@@ -16,8 +18,14 @@ export default function Settings() {
     officeLat: 0,
     officeLng: 0,
     officeRadius: 100,
-    useGeofencing: false
+    useGeofencing: false,
+    useGoogleSheets: false,
+    spreadsheetId: '',
+    spreadsheetUrl: ''
   });
+  const [googleAuthToken, setGoogleAuthToken] = useState<string | null>(getGoogleToken());
+  const [creatingSheet, setCreatingSheet] = useState(false);
+  const [verifyingSheet, setVerifyingSheet] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -96,6 +104,79 @@ export default function Settings() {
         alert("Gagal mengambil lokasi. Pastikan izin lokasi diberikan.");
       }
     );
+  };
+
+  const loginGoogleAccount = async () => {
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+    provider.addScope('https://www.googleapis.com/auth/drive.file');
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setGoogleToken(credential.accessToken);
+        setGoogleAuthToken(credential.accessToken);
+        alert("Akun Google berhasil dihubungkan!");
+      } else {
+        alert("Gagal mendapatkan kode akses Google.");
+      }
+    } catch (err: any) {
+      console.error("Google login error:", err);
+      alert("Gagal menghubungkan ke Google: " + (err.message || err));
+    }
+  };
+
+  const handleCreateNewSheet = async () => {
+    if (!googleAuthToken) {
+      alert("Silakan hubungkan akun Google Anda terlebih dahulu.");
+      return;
+    }
+    
+    setCreatingSheet(true);
+    try {
+      const sheetInfo = await createSpreadsheet(googleAuthToken, "Data Absensi Kesbangpoldagri NTB");
+      const updatedSettings = {
+        ...settings,
+        useGoogleSheets: true,
+        spreadsheetId: sheetInfo.id,
+        spreadsheetUrl: sheetInfo.url
+      };
+      setSettings(updatedSettings);
+      
+      // Save directly to firestore
+      await setDoc(doc(db, 'settings', 'config'), updatedSettings);
+      alert("Berhasil membuat Google Sheets baru untuk absensi!");
+    } catch (err: any) {
+      console.error("Error creating sheet:", err);
+      alert("Gagal membuat Google Sheets: " + (err.message || err));
+    } finally {
+      setCreatingSheet(false);
+    }
+  };
+
+  const handleVerifyAccess = async () => {
+    if (!googleAuthToken) {
+      alert("Silakan hubungkan akun Google Anda terlebih dahulu.");
+      return;
+    }
+    if (!settings.spreadsheetId.trim()) {
+      alert("Silakan masukkan ID Spreadsheet terlebih dahulu.");
+      return;
+    }
+
+    setVerifyingSheet(true);
+    try {
+      const accessible = await verifySpreadsheetAccess(googleAuthToken, settings.spreadsheetId.trim());
+      if (accessible) {
+        alert("Koneksi berhasil! Spreadsheet dapat diakses dengan baik.");
+      } else {
+        alert("Koneksi Gagal. Periksa kembali ID Spreadsheet Anda atau pastikan akun Google berhak mengakses file tersebut.");
+      }
+    } catch (err: any) {
+      alert("Gagal melakukan verifikasi: " + (err.message || err));
+    } finally {
+      setVerifyingSheet(false);
+    }
   };
 
   if (loading) return <div className="animate-pulse space-y-8">...</div>;
@@ -331,11 +412,140 @@ export default function Settings() {
           </p>
           <button
             onClick={downloadOfficeQR}
+            type="button"
             className="mt-8 w-full flex items-center justify-center gap-2 bg-emerald-600 text-white font-bold py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
           >
             <Download className="w-5 h-5" />
             Unduh QR Kantor
           </button>
+        </div>
+
+        {/* Integrasi Google Sheets Bento Card */}
+        <div className="bg-white rounded-3xl border border-stone-200 shadow-xl p-8 flex flex-col">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
+              <Database className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div className="text-left">
+              <h3 className="text-lg font-bold text-stone-900">Integrasi Google Sheets</h3>
+              <p className="text-xs text-stone-400">Hubungkan database absensi ke spreadsheet Anda</p>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {/* Status Google Connection */}
+            <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 flex items-center justify-between text-left">
+              <div>
+                <p className="text-xs font-bold text-stone-500 uppercase tracking-wider">Status Koneksi Akun</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`w-2.5 h-2.5 rounded-full ${googleAuthToken ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`}></span>
+                  <span className="text-sm font-semibold text-stone-700">
+                    {googleAuthToken ? 'Terhubung ke Google' : 'Google Belum Terhubung'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={loginGoogleAccount}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  googleAuthToken 
+                    ? 'bg-stone-200 text-stone-600 hover:bg-stone-300' 
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-100'
+                }`}
+              >
+                {googleAuthToken ? 'Ganti Akun' : 'Hubungkan'}
+              </button>
+            </div>
+
+            {/* Google Sheets Sync Toggles & Settings */}
+            <div className="space-y-4 text-left">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-stone-800">Aktifkan Sinkronisasi Otomatis</h4>
+                  <p className="text-[11px] text-stone-400">Absensi pegawai otomatis masuk ke Sheets</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.useGoogleSheets}
+                    disabled={!googleAuthToken}
+                    onChange={(e) => setSettings({ ...settings, useGoogleSheets: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600 peer-disabled:opacity-50"></div>
+                </label>
+              </div>
+
+              {!googleAuthToken && (
+                <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-[11px] text-amber-700">
+                  <p className="font-bold flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" /> Memerlukan Hubungan Google
+                  </p>
+                  Sesi Google Anda belum aktif. Silakan klik "Hubungkan" di atas terlebih dahulu demi mengizinkan sinkronisasi ke spreadsheet.
+                </div>
+              )}
+
+              {googleAuthToken && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="space-y-4 pt-2 border-t border-stone-100"
+                >
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">ID Spreadsheet Google</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Masukkan ID Spreadsheet..."
+                        value={settings.spreadsheetId}
+                        onChange={(e) => setSettings({ ...settings, spreadsheetId: e.target.value })}
+                        className="flex-1 px-4 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyAccess}
+                        disabled={verifyingSheet}
+                        className="px-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold border border-stone-200 transition-all disabled:opacity-50"
+                      >
+                        {verifyingSheet ? 'Cek..' : 'Tes'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {settings.spreadsheetUrl && (
+                    <a
+                      href={settings.spreadsheetUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Buka Spreadsheet Anda di Google Sheets
+                    </a>
+                  )}
+
+                  <div className="pt-2">
+                    <div className="text-center text-xs text-stone-400 font-semibold mb-2">— ATAU —</div>
+                    <button
+                      type="button"
+                      onClick={handleCreateNewSheet}
+                      disabled={creatingSheet}
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/60 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                    >
+                      {creatingSheet ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 text-emerald-500" />
+                          Buat Google Sheets Absensi Baru
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

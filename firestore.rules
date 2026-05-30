@@ -67,7 +67,11 @@ service cloud.firestore {
              (!('useGeofencing' in data) || data.useGeofencing is bool) &&
              (!('officeLat' in data) || data.officeLat is number) &&
              (!('officeLng' in data) || data.officeLng is number) &&
-             (!('officeRadius' in data) || data.officeRadius is number);
+             (!('officeRadius' in data) || data.officeRadius is number) &&
+             (!('officeQrToken' in data) || data.officeQrToken is string) &&
+             (!('useGoogleSheets' in data) || data.useGoogleSheets is bool) &&
+             (!('spreadsheetId' in data) || data.spreadsheetId is string) &&
+             (!('spreadsheetUrl' in data) || data.spreadsheetUrl is string);
     }
 
     function isValidUser(data) {

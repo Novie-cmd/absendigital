@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, orderBy, onSnapshot, doc, deleteDoc, updateDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, query, where, getDocs, orderBy, onSnapshot, doc, getDoc, deleteDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { db, auth } from '../firebase';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay, subDays, parse } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { FileText, Download, Calendar, Search, Filter, User as UserIcon, Clock, LogIn, LogOut, TrendingUp, AlertCircle, CheckCircle2, Edit2, Trash2, X, Printer } from 'lucide-react';
+import { FileText, Download, Calendar, Search, Filter, User as UserIcon, Clock, LogIn, LogOut, TrendingUp, AlertCircle, CheckCircle2, Edit2, Trash2, X, Printer, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getGoogleToken, setGoogleToken, bulkExportAttendances } from '../utils/googleSheets';
 
 interface AttendanceRecord {
   id: string;
@@ -34,6 +36,23 @@ export default function Reports() {
   const [viewMode, setViewMode] = useState<'history' | 'not-present'>('history');
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [settings, setSettings] = useState<any>(null);
+  const [googleAuthToken, setGoogleAuthToken] = useState<string | null>(getGoogleToken());
+  const [exportingSheets, setExportingSheets] = useState(false);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, 'settings', 'config'));
+        if (docSnap.exists()) {
+          setSettings(docSnap.data());
+        }
+      } catch (err) {
+        console.error("Error fetching settings in reports:", err);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus data absensi ini?')) return;
@@ -182,6 +201,68 @@ export default function Reports() {
     }
   };
 
+  const loginAndExportToSheets = async () => {
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+    provider.addScope('https://www.googleapis.com/auth/drive.file');
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setGoogleToken(credential.accessToken);
+        setGoogleAuthToken(credential.accessToken);
+        // Retry trigger the export
+        setTimeout(() => triggerSheetsExport(credential.accessToken), 500);
+      } else {
+        alert("Gagal menghubungkan Google.");
+      }
+    } catch (err: any) {
+      console.error("Link Google error:", err);
+      alert("Gagal mendaftar Google: " + (err.message || err));
+    }
+  };
+
+  const triggerSheetsExport = async (activeToken: string) => {
+    // Re-fetch current settings to ensure we have the latest spreadsheetId
+    let currentSettings = settings;
+    try {
+      const docSnap = await getDoc(doc(db, 'settings', 'config'));
+      if (docSnap.exists()) {
+        currentSettings = docSnap.data();
+        setSettings(currentSettings);
+      }
+    } catch (err) {
+      console.error("Gagal mendapatkan konfigurasi terbaru:", err);
+    }
+
+    if (!currentSettings?.spreadsheetId) {
+      alert("Spreadsheet belum dibuat. Silakan buka menu Pengaturan terlebih dahulu untuk membuat atau menyetel ID Spreadsheet Google Anda.");
+      return;
+    }
+
+    setExportingSheets(true);
+    try {
+      await bulkExportAttendances(activeToken, currentSettings.spreadsheetId, filteredRecords);
+      alert(`Berhasil mengekspor Laporan (${filteredRecords.length} baris) ke Google Sheets Anda!`);
+    } catch (err: any) {
+      console.error("Error bulk exporting:", err);
+      alert("Gagal melakukan ekspor: " + (err.message || err));
+    } finally {
+      setExportingSheets(false);
+    }
+  };
+
+  const exportToGoogleSheets = async () => {
+    if (!googleAuthToken) {
+      const gCnf = window.confirm("Sesi Google Anda belum aktif atau telah kedaluwarsa. Hubungkan akun Google Anda sekarang untuk langsung melakukan ekspor ke Google Sheets?");
+      if (gCnf) {
+        await loginAndExportToSheets();
+      }
+      return;
+    }
+    await triggerSheetsExport(googleAuthToken);
+  };
+
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -318,7 +399,7 @@ export default function Reports() {
           <h2 className="text-2xl font-bold text-stone-900">Laporan Absensi</h2>
           <p className="text-stone-500 text-sm">Pantau kehadiran pegawai secara berkala.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setViewMode(viewMode === 'history' ? 'not-present' : 'history')}
             className={`flex items-center justify-center gap-2 font-semibold py-3 px-6 rounded-2xl transition-all shadow-lg ${
@@ -348,10 +429,24 @@ export default function Reports() {
           </button>
           <button
             onClick={exportToCSV}
-            className="flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-800 text-white font-semibold py-3 px-6 rounded-2xl transition-all shadow-lg"
+            className="flex items-center justify-center gap-2 bg-white text-stone-700 border border-stone-200 hover:bg-stone-50 font-semibold py-3 px-6 rounded-2xl transition-all shadow-lg"
           >
             <Download className="w-5 h-5" />
             Ekspor CSV
+          </button>
+          <button
+            onClick={exportToGoogleSheets}
+            disabled={exportingSheets}
+            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-2xl transition-all shadow-lg shadow-emerald-50 disabled:opacity-50"
+          >
+            {exportingSheets ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            ) : (
+              <>
+                <Database className="w-5 h-5" />
+                Ekspor Sheets
+              </>
+            )}
           </button>
         </div>
       </div>
