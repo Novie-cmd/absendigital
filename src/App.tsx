@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { LogIn, LogOut, LayoutDashboard, Users, Settings as SettingsIcon, FileText, ScanLine, Lock, UserPlus, CheckCircle2, XCircle, Clock, User as UserIcon, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Scanner from './components/Scanner';
 import AdminPortal from './components/AdminPortal';
 import { recordAttendance, AttendanceResult } from './utils/attendance';
-import { setGoogleToken } from './utils/googleSheets';
+import { setGoogleToken, getGoogleToken, appendAttendanceToSheet } from './utils/googleSheets';
+import { format } from 'date-fns';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -98,8 +99,7 @@ export default function App() {
           }
         }
 
-        const settingsDoc = await getDoc(doc(db, 'settings', 'config'));
-        if (settingsDoc.exists()) setSettings(settingsDoc.data());
+        // Settings are loaded inside the real-time subscription effect below
       } catch (err) {
         console.error('Data fetch error:', err);
       } finally {
@@ -109,6 +109,81 @@ export default function App() {
 
     fetchData();
   }, [user]);
+
+  // 1. Real-time configuration settings listener
+  useEffect(() => {
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'config'), (snap) => {
+      if (snap.exists()) {
+        setSettings(snap.data());
+      }
+    });
+    return () => unsubSettings();
+  }, []);
+
+  // 2. Real-time background Google Sheets synchronization bridge
+  useEffect(() => {
+    if (!isAdmin || !settings?.useGoogleSheets || !settings?.spreadsheetId) return;
+
+    const gToken = getGoogleToken();
+    if (!gToken) {
+      console.warn('Background Sync: Google Sheets is enabled but Google Token is not available.');
+      return;
+    }
+
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const attendanceRef = collection(db, 'attendance');
+    const todayQuery = query(
+      attendanceRef,
+      where('date', '==', today)
+    );
+
+    console.log('Background Sync: Running active listener for Google Sheets sync...');
+
+    const unsubscribe = onSnapshot(todayQuery, async (snapshot) => {
+      const unsyncedDocs = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        return data.syncedToSheets === false || !('syncedToSheets' in data);
+      });
+
+      if (unsyncedDocs.length === 0) return;
+
+      console.log(`Background Sync: Found ${unsyncedDocs.length} unsynced attendance records.`);
+
+      // Process each unsynced record sequentially to prevent API write overlapping
+      for (const d of unsyncedDocs) {
+        const data = d.data();
+        const docRef = doc(db, 'attendance', d.id);
+
+        try {
+          let timeStr = format(new Date(), 'HH:mm:ss');
+          if (data.timestamp) {
+            const dateObj = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+            timeStr = format(dateObj, 'HH:mm:ss');
+          }
+
+          // Trigger append to Google Sheets API
+          await appendAttendanceToSheet(gToken, settings.spreadsheetId, {
+            date: data.date,
+            time: timeStr,
+            employeeId: data.employeeId,
+            employeeName: data.employeeName,
+            type: data.type,
+            method: data.method || 'self_scan',
+            isLate: !!data.isLate,
+            isEarlyLeave: !!data.isEarlyLeave
+          });
+
+          // Mark as successfully synced in Firestore so we don't process it again
+          await setDoc(docRef, { syncedToSheets: true }, { merge: true });
+          console.log(`Background Sync: Document ${d.id} successfully synced to Google Sheets and marked sync=true.`);
+        } catch (syncErr: any) {
+          console.error(`Background Sync: Failed to sync doc ${d.id}`, syncErr);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isAdmin, settings]);
 
   const handleExternalAttendance = async () => {
     if (!user || !externalToken || !settings) return;

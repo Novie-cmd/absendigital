@@ -3,11 +3,19 @@
 let cachedGoogleToken: string | null = null;
 
 export function getGoogleToken(): string | null {
+  if (!cachedGoogleToken) {
+    cachedGoogleToken = localStorage.getItem('google_access_token');
+  }
   return cachedGoogleToken;
 }
 
 export function setGoogleToken(token: string | null) {
   cachedGoogleToken = token;
+  if (token) {
+    localStorage.setItem('google_access_token', token);
+  } else {
+    localStorage.removeItem('google_access_token');
+  }
 }
 
 // Check if a sheet is accessible

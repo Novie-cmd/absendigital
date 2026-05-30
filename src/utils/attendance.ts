@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format } from 'date-fns';
 import { getGoogleToken, appendAttendanceToSheet } from './googleSheets';
@@ -175,7 +175,7 @@ export async function recordAttendance(
 
     // 4. Record attendance
     const methodVal = decodedText === settings?.officeQrToken ? 'self_scan' : 'admin_scan';
-    await addDoc(attendanceRef, {
+    const newDocRef = await addDoc(attendanceRef, {
       employeeId: targetEmployeeId,
       employeeName: targetEmployeeName,
       type,
@@ -183,7 +183,8 @@ export async function recordAttendance(
       date: today,
       method: methodVal,
       isLate,
-      isEarlyLeave
+      isEarlyLeave,
+      syncedToSheets: false
     });
 
     // Real-time Sync to Google Sheets
@@ -202,6 +203,7 @@ export async function recordAttendance(
             isLate,
             isEarlyLeave
           });
+          await setDoc(doc(db, 'attendance', newDocRef.id), { syncedToSheets: true }, { merge: true });
           console.log("Automatically synced attendance to Google Sheets");
         } catch (err) {
           console.error("Gagal melakukan sinkronisasi real-time ke Google Sheets:", err);
