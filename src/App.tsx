@@ -116,6 +116,8 @@ export default function App() {
       if (snap.exists()) {
         setSettings(snap.data());
       }
+    }, (err) => {
+      console.error('Settings listener error:', err);
     });
     return () => unsubSettings();
   }, []);

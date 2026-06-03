@@ -70,12 +70,16 @@ export default function Scanner() {
   useEffect(() => {
     // Fetch user profile and office token
     const fetchData = async () => {
-      if (auth.currentUser) {
-        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-        if (userDoc.exists()) setUserProfile(userDoc.data());
+      try {
+        if (auth.currentUser) {
+          const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+          if (userDoc.exists()) setUserProfile(userDoc.data());
+        }
+        const settingsDoc = await getDoc(doc(db, 'settings', 'config'));
+        if (settingsDoc.exists()) setSettings(settingsDoc.data());
+      } catch (err) {
+        console.error('Error fetching scanner setup data:', err);
       }
-      const settingsDoc = await getDoc(doc(db, 'settings', 'config'));
-      if (settingsDoc.exists()) setSettings(settingsDoc.data());
     };
     fetchData();
   }, []);
