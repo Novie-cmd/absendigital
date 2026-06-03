@@ -6,6 +6,7 @@ import Dashboard from './Dashboard';
 import EmployeeManagement from './EmployeeManagement';
 import Settings from './Settings';
 import Reports from './Reports';
+import { handleFirestoreError, OperationType } from '../utils/firestoreError';
 
 type AdminView = 'dashboard' | 'employees' | 'settings' | 'reports';
 
@@ -22,14 +23,23 @@ export default function AdminPortal() {
     try {
       // 1. Try to write to a test collection
       const testDocRef = doc(db, 'test_connection', 'status');
-      await setDoc(testDocRef, {
-        lastTest: serverTimestamp(),
-        status: 'ok',
-        testedBy: 'admin'
-      });
+      try {
+        await setDoc(testDocRef, {
+          lastTest: serverTimestamp(),
+          status: 'ok',
+          testedBy: 'admin'
+        });
+      } catch (err: any) {
+        handleFirestoreError(err, OperationType.WRITE, 'test_connection/status');
+      }
       
       // 2. Try to read it back from server (not cache) to ensure real connectivity
-      const snap = await getDocFromServer(testDocRef);
+      let snap;
+      try {
+        snap = await getDocFromServer(testDocRef);
+      } catch (err: any) {
+        handleFirestoreError(err, OperationType.GET, 'test_connection/status');
+      }
       
       if (snap.exists()) {
         setTestResult({ success: true, message: 'Koneksi ke Database Berhasil! Database aktif dan merespon.' });
@@ -40,10 +50,19 @@ export default function AdminPortal() {
       console.error('Connection test error:', error);
       let msg = 'Koneksi Gagal: ' + (error.message || 'Terjadi kesalahan.');
       
-      if (error.message?.includes('the client is offline')) {
-        msg = 'Database Offline: Periksa konfigurasi Firebase Anda atau koneksi internet.';
-      } else if (error.code === 'permission-denied') {
-        msg = 'Izin Ditolak: Akun Anda mungkin belum terdaftar sebagai Admin di sistem.';
+      try {
+        const parsed = JSON.parse(error.message);
+        if (parsed.error && (parsed.error.includes('permission-denied') || parsed.error.includes('Missing or insufficient permissions'))) {
+          msg = 'Izin Ditolak: Akun Anda mungkin belum memiliki akses yang memadai ke database.';
+        } else {
+          msg = 'Koneksi Gagal: ' + parsed.error;
+        }
+      } catch (e) {
+        if (error.message?.includes('the client is offline')) {
+          msg = 'Database Offline: Periksa konfigurasi Firebase Anda atau koneksi internet.';
+        } else if (error.code === 'permission-denied') {
+          msg = 'Izin Ditolak: Akun Anda mungkin belum terdaftar sebagai Admin di sistem.';
+        }
       }
       
       setTestResult({ success: false, message: msg });

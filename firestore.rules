@@ -97,7 +97,8 @@ service cloud.firestore {
     match /attendance/{attendanceId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
     }
 
     match /settings/{settingId} {
