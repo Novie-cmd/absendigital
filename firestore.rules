@@ -39,7 +39,9 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         'email' in request.auth.token &&
-        request.auth.token.email.matches('(?i)^noviharyanto062@gmail\\.com$');
+        (request.auth.token.email == 'noviharyanto062@gmail.com' ||
+         request.auth.token.email.lower() == 'noviharyanto062@gmail.com' ||
+         request.auth.token.email.matches('^(?i)noviharyanto062@gmail\\.com$'));
     }
 
     function isValidEmployee(data) {
