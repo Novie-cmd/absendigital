@@ -40,7 +40,6 @@ service cloud.firestore {
       return isAuthenticated() &&
         'email' in request.auth.token &&
         (request.auth.token.email == 'noviharyanto062@gmail.com' ||
-         request.auth.token.email.lower() == 'noviharyanto062@gmail.com' ||
          request.auth.token.email.matches('^(?i)noviharyanto062@gmail\\.com$'));
     }
 
@@ -107,7 +106,11 @@ service cloud.firestore {
     }
 
     match /test_connection/{testId} {
-      allow read, write: if isAdmin();
+      allow read, write: if true;
+    }
+
+    match /test/{testId} {
+      allow read, write: if true;
     }
   }
 }
