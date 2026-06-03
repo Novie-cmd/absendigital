@@ -20,17 +20,15 @@ export function setGoogleToken(token: string | null) {
 
 // Check if a sheet is accessible
 export async function verifySpreadsheetAccess(token: string, spreadsheetId: string): Promise<boolean> {
-  try {
-    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=spreadsheetId`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    return res.ok;
-  } catch (err) {
-    console.error("Error verifying spreadsheet access:", err);
-    return false;
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=spreadsheetId`, {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  if (res.status === 401) {
+    throw new Error("UNAUTHENTICATED");
   }
+  return res.ok;
 }
 
 // Create a new spreadsheet with default 'Absensi' tab and styling headers
@@ -60,6 +58,9 @@ export async function createSpreadsheet(token: string, title: string = "Data Abs
 
   if (!res.ok) {
     const errorText = await res.text();
+    if (res.status === 401) {
+      throw new Error(`UNAUTHENTICATED: Gagal membuat spreadsheet: ${errorText}`);
+    }
     throw new Error(`Gagal membuat spreadsheet: ${errorText}`);
   }
 
@@ -159,6 +160,9 @@ export async function appendAttendanceToSheet(
   if (!res.ok) {
     const errorText = await res.text();
     console.error("Gagal menambahkan baris absensi ke Sheets:", errorText);
+    if (res.status === 401) {
+      throw new Error("UNAUTHENTICATED: " + errorText);
+    }
     throw new Error(errorText);
   }
 
@@ -239,6 +243,9 @@ export async function bulkExportAttendances(
 
   if (!res.ok) {
     const text = await res.text();
+    if (res.status === 401) {
+      throw new Error("UNAUTHENTICATED: " + text);
+    }
     throw new Error(text);
   }
 

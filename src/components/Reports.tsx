@@ -255,7 +255,12 @@ export default function Reports() {
       alert(`Berhasil mengekspor Laporan (${filteredRecords.length} baris) ke Google Sheets Anda!`);
     } catch (err: any) {
       console.error("Error bulk exporting:", err);
-      alert("Gagal melakukan ekspor: " + (err.message || err));
+      if (err.message && (err.message.includes("401") || err.message.includes("UNAUTHENTICATED"))) {
+        setGoogleToken(null);
+        alert("Sesi Google Anda telah berakhir atau tidak valid. Silakan sambungkan kembali akun Google Anda di menu Pengaturan.");
+      } else {
+        alert("Gagal melakukan ekspor: " + (err.message || err));
+      }
     } finally {
       setExportingSheets(false);
     }

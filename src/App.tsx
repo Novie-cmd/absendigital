@@ -180,6 +180,10 @@ export default function App() {
           console.log(`Background Sync: Document ${d.id} successfully synced to Google Sheets and marked sync=true.`);
         } catch (syncErr: any) {
           console.error(`Background Sync: Failed to sync doc ${d.id}`, syncErr);
+          if (syncErr.message && (syncErr.message.includes("401") || syncErr.message.includes("UNAUTHENTICATED"))) {
+            console.warn("Background Sync: Stale Google access token detected. Clearing cached token from memory.");
+            setGoogleToken(null);
+          }
         }
       }
     });

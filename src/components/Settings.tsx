@@ -148,7 +148,13 @@ export default function Settings() {
       alert("Berhasil membuat Google Sheets baru untuk absensi!");
     } catch (err: any) {
       console.error("Error creating sheet:", err);
-      alert("Gagal membuat Google Sheets: " + (err.message || err));
+      if (err.message && (err.message.includes("401") || err.message.includes("UNAUTHENTICATED"))) {
+        setGoogleToken(null);
+        setGoogleAuthToken(null);
+        alert("Sesi Google Anda telah berakhir atau tidak valid. Silakan klik tombol 'Hubungkan' terlebih dahulu untuk menyambungkan kembali akun Google Anda.");
+      } else {
+        alert("Gagal membuat Google Sheets: " + (err.message || err));
+      }
     } finally {
       setCreatingSheet(false);
     }
@@ -173,7 +179,14 @@ export default function Settings() {
         alert("Koneksi Gagal. Periksa kembali ID Spreadsheet Anda atau pastikan akun Google berhak mengakses file tersebut.");
       }
     } catch (err: any) {
-      alert("Gagal melakukan verifikasi: " + (err.message || err));
+      console.error("Error verifying access:", err);
+      if (err.message && (err.message.includes("401") || err.message.includes("UNAUTHENTICATED"))) {
+        setGoogleToken(null);
+        setGoogleAuthToken(null);
+        alert("Sesi Google Anda telah berakhir atau tidak valid. Silakan klik tombol 'Hubungkan' terlebih dahulu untuk menyambungkan kembali akun Google Anda.");
+      } else {
+        alert("Gagal melakukan verifikasi: " + (err.message || err));
+      }
     } finally {
       setVerifyingSheet(false);
     }
