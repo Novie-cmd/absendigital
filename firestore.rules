@@ -84,8 +84,7 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
-      allow read, delete: if isAdmin();
+      allow read, write: if isAuthenticated();
     }
 
     match /employees/{employeeId} {
