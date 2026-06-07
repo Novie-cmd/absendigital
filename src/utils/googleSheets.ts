@@ -125,6 +125,7 @@ export async function appendAttendanceToSheet(
   token: string,
   spreadsheetId: string,
   attendance: {
+    id?: string;
     date: string;
     time: string;
     employeeId: string;
@@ -144,17 +145,18 @@ export async function appendAttendanceToSheet(
     attendance.type === 'in' ? 'Hadir' : 'Pulang',
     attendance.method === 'self_scan' ? 'Scan Mandiri' : 'Input Admin',
     attendance.isLate ? 'Terlambat' : 'Tepat Waktu',
-    attendance.isEarlyLeave ? 'Pulang Awal' : '-'
+    attendance.isEarlyLeave ? 'Pulang Awal' : '-',
+    attendance.id || "" // Column J (Firestore Document ID)
   ];
 
-  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Absensi!A2:I2:append?valueInputOption=USER_ENTERED`, {
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Absensi!A2:J2:append?valueInputOption=USER_ENTERED`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      range: "Absensi!A2:I2",
+      range: "Absensi!A2:J2",
       majorDimension: "ROWS",
       values: [row]
     })
@@ -180,6 +182,7 @@ export async function bulkExportAttendances(
   token: string,
   spreadsheetId: string,
   attendances: Array<{
+    id?: string;
     date: string;
     timestamp: any;
     employeeId: string;
@@ -207,7 +210,8 @@ export async function bulkExportAttendances(
       "Tipe Absen",
       "Metode",
       "Status Lambat",
-      "Status Pulang Cepat"
+      "Status Pulang Cepat",
+      "Firestore ID (Metadata)"
     ]
   ];
 
@@ -227,12 +231,13 @@ export async function bulkExportAttendances(
       att.type === 'in' ? 'Hadir' : 'Pulang',
       att.method === 'self_scan' ? 'Scan Mandiri' : 'Input Admin',
       att.isLate ? 'Terlambat' : 'Tepat Waktu',
-      att.isEarlyLeave ? 'Pulang Awal' : '-'
+      att.isEarlyLeave ? 'Pulang Awal' : '-',
+      att.id || ""
     ]);
   });
 
   // Clear out first 2000 rows to avoid leftovers
-  await clearValues(token, spreadsheetId, "Absensi!A1:I2000");
+  await clearValues(token, spreadsheetId, "Absensi!A1:J2000");
 
   const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Absensi!A1?valueInputOption=USER_ENTERED`, {
     method: 'PUT',
