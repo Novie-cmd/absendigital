@@ -52,8 +52,8 @@ export default function AdminPortal() {
       
       try {
         const parsed = JSON.parse(error.message);
-        if (parsed.error && (parsed.error.includes('permission-denied') || parsed.error.includes('Missing or insufficient permissions'))) {
-          msg = 'Izin Ditolak: Akun Anda mungkin belum memiliki akses yang memadai ke database.';
+        if (parsed.error && (parsed.error.includes('permission-denied') || parsed.error.includes('Missing or insufficient permissions') || parsed.error.includes('PROHIBITED'))) {
+          msg = `Izin Ditolak: Akun Anda belum memiliki akses memadai ke database (Gagal ${parsed.operationType.toUpperCase()} pada '${parsed.path || 'unknown'}'). Periksa aturan keamanan Firebase.`;
         } else {
           msg = 'Koneksi Gagal: ' + parsed.error;
         }

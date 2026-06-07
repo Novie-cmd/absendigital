@@ -38,18 +38,17 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        'email' in request.auth.token &&
-        (request.auth.token.email == 'noviharyanto062@gmail.com' ||
-         request.auth.token.email.matches('^(?i)noviharyanto062@gmail\\.com$'));
+        request.auth.token.email != null &&
+        request.auth.token.email == 'noviharyanto062@gmail.com';
     }
 
     function isValidEmployee(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.employeeId is string && data.employeeId.size() > 0 && data.employeeId.size() < 50 &&
-             (!('email' in data) || (data.email is string && data.email.size() < 100)) &&
-             (!('department' in data) || (data.department is string && data.department.size() < 100)) &&
-             (!('position' in data) || (data.position is string && data.position.size() < 100)) &&
-             (!('createdAt' in data) || (data.createdAt is timestamp || data.createdAt == null));
+             (data.get('email', null) == null || (data.email is string && data.email.size() < 100)) &&
+             (data.get('department', null) == null || (data.department is string && data.department.size() < 100)) &&
+             (data.get('position', null) == null || (data.position is string && data.position.size() < 100)) &&
+             (data.get('createdAt', null) == null || (data.createdAt is timestamp || data.createdAt == null));
     }
 
     function isValidAttendance(data) {
@@ -65,19 +64,19 @@ service cloud.firestore {
              data.workStartTimeFri is string && data.workStartTimeFri.matches("^\\d{2}:\\d{2}$") &&
              data.workEndTimeFri is string && data.workEndTimeFri.matches("^\\d{2}:\\d{2}$") &&
              data.lateThreshold is number &&
-             (!('useGeofencing' in data) || data.useGeofencing is bool) &&
-             (!('officeLat' in data) || data.officeLat is number) &&
-             (!('officeLng' in data) || data.officeLng is number) &&
-             (!('officeRadius' in data) || data.officeRadius is number) &&
-             (!('officeQrToken' in data) || data.officeQrToken is string) &&
-             (!('useGoogleSheets' in data) || data.useGoogleSheets is bool) &&
-             (!('spreadsheetId' in data) || data.spreadsheetId is string) &&
-             (!('spreadsheetUrl' in data) || data.spreadsheetUrl is string);
+             (data.get('useGeofencing', null) == null || data.useGeofencing is bool) &&
+             (data.get('officeLat', null) == null || data.officeLat is number) &&
+             (data.get('officeLng', null) == null || data.officeLng is number) &&
+             (data.get('officeRadius', null) == null || data.officeRadius is number) &&
+             (data.get('officeQrToken', null) == null || data.officeQrToken is string) &&
+             (data.get('useGoogleSheets', null) == null || data.useGoogleSheets is bool) &&
+             (data.get('spreadsheetId', null) == null || data.spreadsheetId is string) &&
+             (data.get('spreadsheetUrl', null) == null || data.spreadsheetUrl is string);
     }
 
     function isValidUser(data) {
       return data.email is string && 
-             (!('role' in data) || (data.role in ['admin', 'employee']));
+             (data.get('role', null) == null || (data.role in ['admin', 'employee']));
     }
 
     // ===============================================================
