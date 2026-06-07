@@ -84,20 +84,23 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
 
     match /employees/{employeeId} {
       allow read: if true;
-      allow write: if isAdmin() || true;
+      allow write: if isAdmin();
     }
 
     match /attendance/{attendanceId} {
-      allow read, write: if true;
+      allow create: if true;
+      allow read: if true;
+      allow update, delete: if isAdmin();
     }
 
     match /settings/{settingId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /test_connection/{testId} {
