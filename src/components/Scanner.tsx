@@ -66,6 +66,15 @@ export default function Scanner() {
   const [isCameraLoading, setIsCameraLoading] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+  const [isInIframe, setIsInIframe] = useState(false);
+
+  useEffect(() => {
+    try {
+      setIsInIframe(window.self !== window.top);
+    } catch (e) {
+      setIsInIframe(true);
+    }
+  }, []);
 
   useEffect(() => {
     // Fetch user profile and office token
@@ -179,11 +188,31 @@ export default function Scanner() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto flex flex-col items-center gap-8">
+    <div className="max-w-2xl mx-auto flex flex-col items-center gap-6">
       <div className="text-center">
         <h2 className="text-3xl font-bold text-stone-900">Scan Barcode / QR Code</h2>
         <p className="text-stone-500 mt-2">Arahkan barcode pegawai Anda ke kamera untuk melakukan absensi.</p>
       </div>
+
+      {isInIframe && (
+        <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3 text-left">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="text-sm font-bold text-amber-800">Pemberitahuan Link Kamera (Iframe Sandbox)</h4>
+            <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+              Jika Anda mengakses melalui Google AI Studio preview, browser akan otomatis menolak akses kamera demi keamanan iframe. Klik tombol di bawah untuk membuka aplikasi di Tab Baru secara mandiri demi mengaktifkan kamera.
+            </p>
+            <a
+              href={window.location.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg transition-all mt-3 shadow-md"
+            >
+              Buka di Tab Baru ↗
+            </a>
+          </div>
+        </div>
+      )}
 
       <div className="w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-stone-200 p-6">
         <AnimatePresence mode="wait">
@@ -203,18 +232,34 @@ export default function Scanner() {
               )}
               
               {cameraError && (
-                <div className="absolute inset-0 z-20 bg-white flex flex-col items-center justify-center p-8 text-center gap-4 rounded-2xl min-h-[300px]">
+                <div className="absolute inset-0 z-20 bg-white flex flex-col items-center justify-center p-6 text-center gap-4 rounded-2xl min-h-[300px]">
                   <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
                     <AlertCircle className="w-8 h-8 text-red-600" />
                   </div>
-                  <p className="text-stone-700 font-medium">{cameraError}</p>
-                  <button
-                    onClick={startCamera}
-                    className="flex items-center gap-2 bg-stone-900 hover:bg-stone-800 text-white px-6 py-2 rounded-xl transition-all"
-                  >
-                    <Camera className="w-4 h-4" />
-                    Coba Lagi
-                  </button>
+                  <div>
+                    <p className="text-stone-800 font-semibold mb-1 text-sm sm:text-base">{cameraError}</p>
+                    <p className="text-xs text-stone-500 max-w-sm mx-auto leading-relaxed">
+                      Kebanyakan browser memblokir kamera di dalam frame pratinjau. Silakan buka aplikasi pada tab mandiri (Tab Baru) untuk menyelesaikannya.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 w-full justify-center items-center mt-2 px-4">
+                    <a
+                      href={window.location.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-xl transition-all shadow-md text-sm w-full sm:w-auto"
+                    >
+                      Buka di Tab Baru ↗
+                    </a>
+                    
+                    <button
+                      onClick={startCamera}
+                      className="flex items-center justify-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold px-5 py-2.5 rounded-xl transition-all text-sm w-full sm:w-auto border border-stone-200"
+                    >
+                      <Camera className="w-4 h-4" />
+                      Coba Lagi
+                    </button>
+                  </div>
                 </div>
               )}
 
