@@ -184,6 +184,8 @@ export default function Settings() {
         setGoogleToken(null);
         setGoogleAuthToken(null);
         alert("Sesi Google Anda telah berakhir atau tidak valid. Silakan klik tombol 'Hubungkan' terlebih dahulu untuk menyambungkan kembali akun Google Anda.");
+      } else if (err.message === "NOT_FOUND" || (err.message && err.message.includes("404"))) {
+        alert("Gagal melakukan verifikasi: Spreadsheet tidak ditemukan atau telah dihapus dari Google Drive Anda. Silakan hapus ID tersebut lalu klik tombol hijau di bawah untuk membuat spreadsheet yang baru.");
       } else {
         alert("Gagal melakukan verifikasi: " + (err.message || err));
       }
@@ -511,7 +513,14 @@ export default function Settings() {
                         type="text"
                         placeholder="Masukkan ID Spreadsheet..."
                         value={settings.spreadsheetId}
-                        onChange={(e) => setSettings({ ...settings, spreadsheetId: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSettings({
+                            ...settings,
+                            spreadsheetId: val,
+                            spreadsheetUrl: val.trim() ? `https://docs.google.com/spreadsheets/d/${val.trim()}/edit` : ''
+                          });
+                        }}
                         className="flex-1 px-4 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-mono"
                       />
                       <button
@@ -525,16 +534,21 @@ export default function Settings() {
                     </div>
                   </div>
 
-                  {settings.spreadsheetUrl && (
-                    <a
-                      href={settings.spreadsheetUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      Buka Spreadsheet Anda di Google Sheets
-                    </a>
+                  {settings.spreadsheetId && (
+                    <div className="space-y-1.5 p-3.5 bg-emerald-50/40 rounded-2xl border border-emerald-100 flex flex-col items-start">
+                      <a
+                        href={`https://docs.google.com/spreadsheets/d/${settings.spreadsheetId}/edit`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 transition underline decoration-dashed underline-offset-4"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Buka Spreadsheet Anda di Google Sheets ↗
+                      </a>
+                      <p className="text-[11px] text-stone-500 leading-relaxed">
+                        <strong>Catatan Penting:</strong> Jika spreadsheet Anda dilaporkan <em>telah dihapus</em> atau tidak dapat diakses di Google Drive, silakan hapus ID Spreadsheet di atas dan buat sheet yang baru dengan menekan tombol hijau di bawah ini.
+                      </p>
+                    </div>
                   )}
 
                   <div className="pt-2">

@@ -28,6 +28,9 @@ export async function verifySpreadsheetAccess(token: string, spreadsheetId: stri
   if (res.status === 401) {
     throw new Error("UNAUTHENTICATED");
   }
+  if (res.status === 404) {
+    throw new Error("NOT_FOUND");
+  }
   return res.ok;
 }
 
@@ -163,6 +166,9 @@ export async function appendAttendanceToSheet(
     if (res.status === 401) {
       throw new Error("UNAUTHENTICATED: " + errorText);
     }
+    if (res.status === 404) {
+      throw new Error("NOT_FOUND");
+    }
     throw new Error(errorText);
   }
 
@@ -245,6 +251,9 @@ export async function bulkExportAttendances(
     const text = await res.text();
     if (res.status === 401) {
       throw new Error("UNAUTHENTICATED: " + text);
+    }
+    if (res.status === 404) {
+      throw new Error("NOT_FOUND");
     }
     throw new Error(text);
   }
