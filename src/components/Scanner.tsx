@@ -129,12 +129,23 @@ export default function Scanner() {
       
       setIsCameraLoading(false);
     } catch (err: any) {
-      console.error("Gagal memulai kamera:", err);
+      const isPermissionOrDeviceErr = 
+        err?.name === "NotAllowedError" || 
+        err?.message?.includes("Permission denied") || 
+        err?.name === "NotFoundError" || 
+        err?.message?.includes("NotFound") ||
+        err?.name === "DevicesNotFoundError";
+
+      if (isPermissionOrDeviceErr) {
+        console.warn("Gagal memulai kamera (perangkat/izin dibatasi):", err);
+      } else {
+        console.error("Gagal memulai kamera:", err);
+      }
       setIsCameraLoading(false);
       
-      if (err?.message?.includes("Permission denied")) {
+      if (err?.message?.includes("Permission denied") || err?.name === "NotAllowedError") {
         setCameraError("Izin kamera ditolak. Silakan izinkan kamera di pengaturan browser Anda.");
-      } else if (err?.message?.includes("NotFound")) {
+      } else if (err?.message?.includes("NotFound") || err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
         setCameraError("Kamera tidak ditemukan. Pastikan perangkat Anda memiliki kamera.");
       } else {
         setCameraError("Gagal mengakses kamera. Silakan coba muat ulang halaman atau pastikan kamera tidak sedang digunakan aplikasi lain.");
@@ -148,7 +159,7 @@ export default function Scanner() {
         await html5QrCodeRef.current.stop();
         html5QrCodeRef.current = null;
       } catch (err) {
-        console.error("Gagal menghentikan kamera:", err);
+        console.warn("Gagal menghentikan kamera secara bersih:", err);
       }
     }
   };
@@ -173,7 +184,7 @@ export default function Scanner() {
           lng: position.coords.longitude
         };
       } catch (locErr) {
-        console.error('Location error:', locErr);
+        console.warn('Location/Geofencing error:', locErr);
       }
     }
 
