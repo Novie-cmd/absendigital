@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot, runTransaction, updateDoc } from 'firebase/firestore';
 import { LogIn, LogOut, LayoutDashboard, Users, Settings as SettingsIcon, FileText, ScanLine, Lock, UserPlus, CheckCircle2, XCircle, Clock, User as UserIcon, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Scanner from './components/Scanner';
@@ -156,10 +156,36 @@ export default function App() {
 
       // Process each unsynced record sequentially to prevent API write overlapping
       for (const d of unsyncedDocs) {
-        const data = d.data();
         const docRef = doc(db, 'attendance', d.id);
 
-        // Lock document processing
+        // Try to obtain an exclusive synchronization lock using a Firestore transaction.
+        // This ensures that if multiple browser tabs or devices are open, only ONE wins the race
+        // to append to Google Sheets.
+        let dataToSync = null;
+        try {
+          await runTransaction(db, async (transaction) => {
+            const freshDoc = await transaction.get(docRef);
+            if (!freshDoc.exists()) {
+              throw new Error("Document does not exist");
+            }
+            const freshData = freshDoc.data();
+            // If another client has already synced or is currently syncing, abort transaction
+            if (freshData.syncedToSheets === true || freshData.syncedToSheets === 'syncing') {
+              throw new Error("Already synced or syncing ongoing");
+            }
+            // Acquire the lock by setting state to 'syncing'
+            transaction.update(docRef, { syncedToSheets: 'syncing' });
+            dataToSync = freshData;
+          });
+        } catch (lockError: any) {
+          console.log(`Background Sync: Skip syncing document ${d.id} as it is already being processed or completed:`, lockError.message);
+          continue;
+        }
+
+        if (!dataToSync) continue;
+        const data: any = dataToSync;
+
+        // Lock document processing in local memory too
         processingIds.add(d.id);
 
         try {
@@ -183,12 +209,17 @@ export default function App() {
           });
 
           // Mark as successfully synced in Firestore so we don't process it again
-          await setDoc(docRef, { syncedToSheets: true }, { merge: true });
+          await updateDoc(docRef, { syncedToSheets: true });
           console.log(`Background Sync: Document ${d.id} successfully synced to Google Sheets and marked sync=true.`);
         } catch (syncErr: any) {
           console.error(`Background Sync: Failed to sync doc ${d.id}`, syncErr);
-          // Unlock on failure to allow retry
+          // Unlock on failure to allow retry (set back to false)
           processingIds.delete(d.id);
+          try {
+            await updateDoc(docRef, { syncedToSheets: false });
+          } catch (revertErr) {
+            console.error("Failed to revert syncedToSheets status", revertErr);
+          }
           if (syncErr.message && (syncErr.message.includes("401") || syncErr.message.includes("UNAUTHENTICATED"))) {
             console.warn("Background Sync: Stale Google access token detected. Clearing cached token from memory.");
             setGoogleToken(null);
