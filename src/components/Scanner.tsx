@@ -58,7 +58,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
-export default function Scanner() {
+export default function Scanner({ dinasId, settingsProp }: { dinasId?: string; settingsProp?: any }) {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string; data?: any } | null>(null);
@@ -84,14 +84,19 @@ export default function Scanner() {
           const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
           if (userDoc.exists()) setUserProfile(userDoc.data());
         }
-        const settingsDoc = await getDoc(doc(db, 'settings', 'config'));
+        const currentDinasId = dinasId || 'kesbangpol';
+        const settingsDoc = await getDoc(doc(db, 'settings', currentDinasId));
         if (settingsDoc.exists()) setSettings(settingsDoc.data());
       } catch (err) {
         console.error('Error fetching scanner setup data:', err);
       }
     };
-    fetchData();
-  }, []);
+    if (settingsProp) {
+      setSettings(settingsProp);
+    } else {
+      fetchData();
+    }
+  }, [dinasId, settingsProp]);
 
   useEffect(() => {
     if (isScanning && !scanResult) {

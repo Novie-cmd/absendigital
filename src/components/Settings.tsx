@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { getGoogleToken, setGoogleToken, createSpreadsheet, verifySpreadsheetAccess } from '../utils/googleSheets';
 
-export default function Settings() {
+export default function Settings({ dinasId }: { dinasId?: string }) {
   const [settings, setSettings] = useState({
     workStartTimeMonThu: '08:00',
     workEndTimeMonThu: '17:00',
@@ -32,7 +32,8 @@ export default function Settings() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'config'), (docSnap) => {
+    const currentDinasId = dinasId || 'kesbangpol';
+    const unsubscribe = onSnapshot(doc(db, 'settings', currentDinasId), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setSettings(prev => ({ ...prev, ...data }));
@@ -45,14 +46,18 @@ export default function Settings() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [dinasId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
+    const currentDinasId = dinasId || 'kesbangpol';
     try {
-      await setDoc(doc(db, 'settings', 'config'), settings);
+      await setDoc(doc(db, 'settings', currentDinasId), {
+        ...settings,
+        dinasId: currentDinasId
+      }, { merge: true });
       setMessage({ type: 'success', text: 'Pengaturan berhasil disimpan!' });
       setTimeout(() => setMessage(null), 3000);
     } catch (err: any) {

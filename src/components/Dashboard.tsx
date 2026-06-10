@@ -8,7 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { motion } from 'motion/react';
 import { getGoogleToken } from '../utils/googleSheets';
 
-export default function Dashboard() {
+export default function Dashboard({ dinasId }: { dinasId?: string }) {
   const [stats, setStats] = useState({
     totalEmployees: 0,
     presentToday: 0,
@@ -24,11 +24,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
+    const currentDinasId = dinasId || 'kesbangpol';
     
-    // 1. Get total employees
+    // 1. Get total employees (client-side filtered for robust backward compatibility)
     const employeesRef = collection(db, 'employees');
     const unsubscribeEmployees = onSnapshot(employeesRef, (snapshot) => {
-      setStats(prev => ({ ...prev, totalEmployees: snapshot.size }));
+      const filteredDocs = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        return data.dinasId === currentDinasId || (!data.dinasId && currentDinasId === 'kesbangpol');
+      });
+      setStats(prev => ({ ...prev, totalEmployees: filteredDocs.length }));
       setError(null);
     }, (err) => {
       console.error('Dashboard: Employees snapshot error:', err);
@@ -39,30 +44,29 @@ export default function Dashboard() {
     const attendanceRef = collection(db, 'attendance');
     const todayQuery = query(attendanceRef, where('date', '==', today));
     const unsubscribeToday = onSnapshot(todayQuery, (snapshot) => {
+      const filteredDocs = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        return data.dinasId === currentDinasId || (!data.dinasId && currentDinasId === 'kesbangpol');
+      });
       const presentIds = new Set();
       let lateCount = 0;
-      snapshot.docs.forEach(doc => {
+      filteredDocs.forEach(doc => {
         const data = doc.data();
         if (data.type === 'in') {
           presentIds.add(data.employeeId);
           if (data.isLate) lateCount++;
         }
       });
-      setStats(prev => ({ 
-        ...prev, 
-        presentToday: presentIds.size,
-        absentToday: Math.max(0, prev.totalEmployees - presentIds.size),
-        lateToday: lateCount
-      }));
+      setStats(prev => ({ ...prev, presentToday: presentIds.size, lateToday: lateCount }));
     }, (err) => {
       console.error('Dashboard: Today attendance snapshot error:', err);
     });
 
     // 3. Get recent activity
-    const recentQuery = query(attendanceRef, limit(20));
-    const unsubscribeRecent = onSnapshot(recentQuery, (snapshot) => {
+    const unsubscribeRecent = onSnapshot(collection(db, 'attendance'), (snapshot) => {
       const sorted = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .map(doc => ({ id: doc.id, ...doc.data() as any }))
+        .filter(data => data.dinasId === currentDinasId || (!data.dinasId && currentDinasId === 'kesbangpol'))
         .sort((a: any, b: any) => {
           const timeA = a.timestamp?.toMillis?.() || 0;
           const timeB = b.timestamp?.toMillis?.() || 0;
@@ -75,16 +79,22 @@ export default function Dashboard() {
     });
 
     // 4. Get Google Sheets config and unsynced count in real-time
-    const unsubscribeConfig = onSnapshot(doc(db, 'settings', 'config'), (snap) => {
+    const unsubscribeConfig = onSnapshot(doc(db, 'settings', currentDinasId), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setGoogleSheetsEnabled(!!data.useGoogleSheets && !!data.spreadsheetId);
+      } else {
+        setGoogleSheetsEnabled(false);
       }
     });
 
-    const unsyncedQuery = query(collection(db, 'attendance'), where('syncedToSheets', '==', false));
-    const unsubscribeUnsynced = onSnapshot(unsyncedQuery, (snap) => {
-      setHasUnsynced(!snap.empty);
+    const unsubscribeUnsynced = onSnapshot(collection(db, 'attendance'), (snap) => {
+      const unsyncedCount = snap.docs.filter(doc => {
+        const data = doc.data();
+        const matchesDinas = data.dinasId === currentDinasId || (!data.dinasId && currentDinasId === 'kesbangpol');
+        return data.syncedToSheets === false && matchesDinas;
+      }).length;
+      setHasUnsynced(unsyncedCount > 0);
     });
 
     // 5. Get chart data (last 7 days)
@@ -96,7 +106,11 @@ export default function Dashboard() {
           const dateStr = format(date, 'yyyy-MM-dd');
           const q = query(attendanceRef, where('date', '==', dateStr), where('type', '==', 'in'));
           const snapshot = await getDocs(q);
-          const uniquePresent = new Set(snapshot.docs.map(doc => doc.data().employeeId)).size;
+          const filteredDocs = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            return data.dinasId === currentDinasId || (!data.dinasId && currentDinasId === 'kesbangpol');
+          });
+          const uniquePresent = new Set(filteredDocs.map(doc => doc.data().employeeId)).size;
           return {
             name: format(date, 'EEE', { locale: id }),
             present: uniquePresent,
@@ -122,7 +136,7 @@ export default function Dashboard() {
       unsubscribeConfig();
       unsubscribeUnsynced();
     };
-  }, []);
+  }, [dinasId]);
 
   const statCards = [
     { label: 'Total Pegawai', value: stats.totalEmployees, icon: Users, color: 'bg-blue-500' },

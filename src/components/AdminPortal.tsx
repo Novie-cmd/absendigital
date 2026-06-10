@@ -10,7 +10,7 @@ import { handleFirestoreError, OperationType } from '../utils/firestoreError';
 
 type AdminView = 'dashboard' | 'employees' | 'settings' | 'reports';
 
-export default function AdminPortal() {
+export default function AdminPortal({ dinasId, dinasName }: { dinasId?: string; dinasName?: string }) {
   const [activeView, setActiveView] = useState<AdminView>('dashboard');
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -130,10 +130,10 @@ export default function AdminPortal() {
 
       {/* Content Area */}
       <div className="flex-1 min-w-0">
-        {activeView === 'dashboard' && <Dashboard />}
-        {activeView === 'employees' && <EmployeeManagement />}
-        {activeView === 'settings' && <Settings />}
-        {activeView === 'reports' && <Reports />}
+        {activeView === 'dashboard' && <Dashboard dinasId={dinasId} />}
+        {activeView === 'employees' && <EmployeeManagement dinasId={dinasId} />}
+        {activeView === 'settings' && <Settings dinasId={dinasId} />}
+        {activeView === 'reports' && <Reports dinasId={dinasId} />}
       </div>
     </div>
   );

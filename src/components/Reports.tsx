@@ -17,15 +17,17 @@ interface AttendanceRecord {
   date: string;
   isLate?: boolean;
   isEarlyLeave?: boolean;
+  dinasId?: string;
 }
 
 interface Employee {
   id: string;
   name: string;
   employeeId: string;
+  dinasId?: string;
 }
 
-export default function Reports() {
+export default function Reports({ dinasId }: { dinasId?: string }) {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
@@ -43,7 +45,8 @@ export default function Reports() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const docSnap = await getDoc(doc(db, 'settings', 'config'));
+        const currentDinasId = dinasId || 'kesbangpol';
+        const docSnap = await getDoc(doc(db, 'settings', currentDinasId));
         if (docSnap.exists()) {
           setSettings(docSnap.data());
         }
@@ -52,7 +55,7 @@ export default function Reports() {
       }
     };
     fetchSettings();
-  }, []);
+  }, [dinasId]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus data absensi ini?')) return;
@@ -72,11 +75,6 @@ export default function Reports() {
     try {
       const recordRef = doc(db, 'attendance', editingRecord.id);
       
-      // If timestamp is edited as string, convert back to Firestore Timestamp
-      // For simplicity, we'll assume the user might want to edit the date and time
-      // But let's just allow editing the type and status for now if we don't want to overcomplicate
-      // Actually, let's allow editing the type and the 'isLate'/'isEarlyLeave' flags
-      
       await updateDoc(recordRef, {
         type: editingRecord.type,
         isLate: editingRecord.isLate || false,
@@ -93,25 +91,32 @@ export default function Reports() {
 
   useEffect(() => {
     // Fetch employees for dropdown and "not present" check
+    const currentDinasId = dinasId || 'kesbangpol';
     const employeesQuery = query(collection(db, 'employees'), orderBy('name', 'asc'));
     const unsubscribeEmployees = onSnapshot(employeesQuery, (snapshot) => {
-      setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
+      const filtered = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Employee))
+        .filter(emp => emp.dinasId === currentDinasId || (!emp.dinasId && currentDinasId === 'kesbangpol'));
+      setEmployees(filtered);
     });
 
     return () => unsubscribeEmployees();
-  }, []);
+  }, [dinasId]);
 
   useEffect(() => {
     setLoading(true);
+    const currentDinasId = dinasId || 'kesbangpol';
     const q = query(
       collection(db, 'attendance'),
       where('date', '>=', startDate),
-      where('date', '<=', endDate),
-      orderBy('date', 'desc')
+      where('date', '<=', endDate)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceRecord));
+      const fetched = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as AttendanceRecord))
+        .filter(rec => rec.dinasId === currentDinasId || (!rec.dinasId && currentDinasId === 'kesbangpol'));
+
       // Sort in memory by date (desc) and then timestamp (desc)
       fetched.sort((a, b) => {
         if (a.date !== b.date) {
@@ -123,10 +128,13 @@ export default function Reports() {
       });
       setRecords(fetched);
       setLoading(false);
+    }, (err) => {
+      console.error('Reports query error:', err);
+      setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, dinasId]);
 
   const filteredRecords = records.filter(record => {
     const matchesSearch = record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -234,8 +242,9 @@ export default function Reports() {
   const triggerSheetsExport = async (activeToken: string) => {
     // Re-fetch current settings to ensure we have the latest spreadsheetId
     let currentSettings = settings;
+    const currentDinasId = dinasId || 'kesbangpol';
     try {
-      const docSnap = await getDoc(doc(db, 'settings', 'config'));
+      const docSnap = await getDoc(doc(db, 'settings', currentDinasId));
       if (docSnap.exists()) {
         currentSettings = docSnap.data();
         setSettings(currentSettings);

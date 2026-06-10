@@ -9,6 +9,7 @@ import AdminPortal from './components/AdminPortal';
 import { recordAttendance, AttendanceResult } from './utils/attendance';
 import { setGoogleToken, getGoogleToken, appendAttendanceToSheet } from './utils/googleSheets';
 import { format } from 'date-fns';
+import { DEFAULT_DINAS_LIST, Dinas } from './utils/dinases';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -23,6 +24,31 @@ export default function App() {
   const [attendanceResult, setAttendanceResult] = useState<AttendanceResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [settings, setSettings] = useState<any>(null);
+
+  // Dinas states
+  const [dinases, setDinases] = useState<Dinas[]>(DEFAULT_DINAS_LIST);
+  const [selectedDinasId, setSelectedDinasId] = useState<string>('');
+  const [isRegisteringDinas, setIsRegisteringDinas] = useState(false);
+  const [newDinasName, setNewDinasName] = useState('');
+  const [dinasLoading, setDinasLoading] = useState(false);
+
+  useEffect(() => {
+    // Dynarnically listen and merge custom Dinases from Firestore
+    console.log('App: Setting up metadata and dynamically listening to dinas list...');
+    const unsub = onSnapshot(collection(db, 'dinases'), (snap) => {
+      const customDinases = snap.docs.map(doc => ({ id: doc.id, name: doc.data().name } as Dinas));
+      const merged = [...DEFAULT_DINAS_LIST];
+      customDinases.forEach(cd => {
+        if (!merged.some(m => m.id === cd.id)) {
+          merged.push(cd);
+        }
+      });
+      setDinases(merged);
+    }, (err) => {
+      console.warn('Custom dinases snapshot listener failed, using defaults.', err);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     // Check for external scan token in URL
@@ -66,7 +92,7 @@ export default function App() {
         if (userDoc.exists()) {
           currentProfile = userDoc.data();
           setUserProfile(currentProfile);
-          if (currentProfile.role === 'admin') setIsAdmin(true);
+          if (currentProfile.role === 'admin' || userEmail === adminEmail) setIsAdmin(true);
           if (currentProfile.employeeId) setEmployeeId(currentProfile.employeeId);
         } else {
           // SEAMLESS AUTO-LINK: Check if email exists in employees collection
@@ -81,6 +107,8 @@ export default function App() {
               name: user.displayName,
               employeeId: employeeData.employeeId,
               employeeName: employeeData.name,
+              dinasId: employeeData.dinasId || 'kesbangpol',
+              dinasName: employeeData.dinasName || 'Kesbangpoldagri NTB',
               role: userEmail === adminEmail ? 'admin' : 'employee',
               updatedAt: serverTimestamp()
             };
@@ -90,7 +118,7 @@ export default function App() {
               await setDoc(doc(db, 'users', user.uid), newProfile);
               setUserProfile(newProfile);
               setEmployeeId(employeeData.employeeId);
-              if (newProfile.role === 'admin') setIsAdmin(true);
+              if (newProfile.role === 'admin' || userEmail === adminEmail) setIsAdmin(true);
               console.log('Seamlessly linked account for:', employeeData.name);
             } catch (err: any) {
               console.error('Error during seamless link:', err);
@@ -112,7 +140,8 @@ export default function App() {
 
   // 1. Real-time configuration settings listener
   useEffect(() => {
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'config'), (snap) => {
+    const currentDinasId = userProfile?.dinasId || 'kesbangpol';
+    const unsubSettings = onSnapshot(doc(db, 'settings', currentDinasId), (snap) => {
       if (snap.exists()) {
         setSettings(snap.data());
       }
@@ -120,7 +149,93 @@ export default function App() {
       console.error('Settings listener error:', err);
     });
     return () => unsubSettings();
-  }, []);
+  }, [userProfile?.dinasId]);
+
+  const handleSelectDinas = async (dinas: Dinas, roleSet: 'admin' | 'employee') => {
+    if (!user) return;
+    setDinasLoading(true);
+    try {
+      const updatedProfile = {
+        email: user.email,
+        name: user.displayName,
+        dinasId: dinas.id,
+        dinasName: dinas.name,
+        role: roleSet,
+        employeeId: roleSet === 'admin' ? 'ADMIN_TEMP' : '',
+        updatedAt: serverTimestamp()
+      };
+      await setDoc(doc(db, 'users', user.uid), updatedProfile);
+      setUserProfile(updatedProfile);
+      if (roleSet === 'admin') {
+        setIsAdmin(true);
+        setEmployeeId('ADMIN_TEMP');
+      }
+    } catch (err) {
+      console.error("Gagal memilih dinas:", err);
+      alert("Gagal memilih dinas");
+    } finally {
+      setDinasLoading(false);
+    }
+  };
+
+  const handleCreateDinas = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !newDinasName.trim()) return;
+    setDinasLoading(true);
+    try {
+      const generatedSlug = newDinasName.toLowerCase().trim()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+
+      const finalSlug = generatedSlug || `skpd-${Date.now()}`;
+
+      // 1. Create settings document
+      await setDoc(doc(db, 'settings', finalSlug), {
+        dinasId: finalSlug,
+        dinasName: newDinasName.trim(),
+        workStartTimeMonThu: '08:00',
+        workEndTimeMonThu: '17:00',
+        workStartTimeFri: '08:00',
+        workEndTimeFri: '16:30',
+        lateThreshold: 15,
+        officeLat: 0,
+        officeLng: 0,
+        officeRadius: 100,
+        useGeofencing: false,
+        useGoogleSheets: false,
+        spreadsheetId: '',
+        spreadsheetUrl: ''
+      });
+
+      // 2. Register Dinas
+      await setDoc(doc(db, 'dinases', finalSlug), {
+        id: finalSlug,
+        name: newDinasName.trim()
+      });
+
+      // 3. Save profile
+      const updatedProfile = {
+        email: user.email,
+        name: user.displayName,
+        dinasId: finalSlug,
+        dinasName: newDinasName.trim(),
+        role: 'admin',
+        employeeId: 'ADMIN_TEMP',
+        updatedAt: serverTimestamp()
+      };
+
+      await setDoc(doc(db, 'users', user.uid), updatedProfile);
+      setUserProfile(updatedProfile);
+      setIsAdmin(true);
+      setEmployeeId('ADMIN_TEMP');
+    } catch (err) {
+      console.error("Gagal meregistrasi Dinas baru:", err);
+      alert("Gagal meregistrasi Dinas baru");
+    } finally {
+      setDinasLoading(false);
+    }
+  };
 
   // 2. Real-time background Google Sheets synchronization bridge
   useEffect(() => {
@@ -142,12 +257,14 @@ export default function App() {
     console.log('Background Sync: Running active listener for Google Sheets sync...');
 
     const processingIds = new Set<string>();
+    const currentDinasId = userProfile?.dinasId || 'kesbangpol';
 
     const unsubscribe = onSnapshot(todayQuery, async (snapshot) => {
       const unsyncedDocs = snapshot.docs.filter(doc => {
         const data = doc.data();
+        const matchesDinas = data.dinasId === currentDinasId || (!data.dinasId && currentDinasId === 'kesbangpol');
         const isNotSynced = data.syncedToSheets === false || !('syncedToSheets' in data);
-        return isNotSynced && !processingIds.has(doc.id);
+        return isNotSynced && matchesDinas && !processingIds.has(doc.id);
       });
 
       if (unsyncedDocs.length === 0) return;
@@ -274,36 +391,48 @@ export default function App() {
     if (!user || !linkId.trim()) return;
     
     setLinking(true);
+    const currentDinasId = userProfile?.dinasId || 'kesbangpol';
+    const currentDinasName = userProfile?.dinasName || 'Kesbangpoldagri NTB';
     try {
-      // 1. Verify if employeeId exists in employees collection
+      // 1. Verify if employeeId exists in employees collection for current Dinas
       let employeeData;
       try {
         const employeesRef = collection(db, 'employees');
-        const q = query(employeesRef, where('employeeId', '==', linkId.trim()));
-        const snap = await getDocs(q);
+        let q = query(employeesRef, where('employeeId', '==', linkId.trim()), where('dinasId', '==', currentDinasId));
+        let snap = await getDocs(q);
         
         if (snap.empty) {
-          alert('ID Pegawai tidak ditemukan. Silakan hubungi admin untuk mendaftarkan ID Anda.');
+          // Fallback search to find it without dinasId for backwards-compatibility
+          const qFallback = query(employeesRef, where('employeeId', '==', linkId.trim()));
+          snap = await getDocs(qFallback);
+        }
+
+        if (snap.empty) {
+          alert(`ID Pegawai tidak ditemukan di dinas ${currentDinasName}. Silakan hubungi admin Anda.`);
           setLinking(false);
           return;
         }
         employeeData = snap.docs[0].data();
       } catch (err: any) {
         console.error('Error querying employees:', err);
-        throw new Error('Gagal memverifikasi ID Pegawai: ' + err.message);
+        throw new Error('Gagal memverifikasi NIP/NIK Pegawai: ' + err.message);
       }
 
       // 2. Link to user document
       try {
         console.log('Attempting to link account for UID:', user.uid);
-        await setDoc(doc(db, 'users', user.uid), {
+        const updated = {
           email: user.email,
           name: user.displayName,
           employeeId: linkId.trim(),
           employeeName: employeeData.name,
+          dinasId: currentDinasId,
+          dinasName: currentDinasName,
           role: 'employee',
           updatedAt: serverTimestamp()
-        }, { merge: true });
+        };
+        await setDoc(doc(db, 'users', user.uid), updated, { merge: true });
+        setUserProfile(updated);
       } catch (err: any) {
         console.error('Error setting user doc:', err);
         throw new Error('Gagal menyimpan profil pengguna: ' + err.message);
@@ -371,7 +500,7 @@ export default function App() {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-stone-200"
         >
-          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em] mb-4">Kesbangpoldagri NTB</p>
+          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em] mb-4">SISTEM ABSENSI SKPD/DINAS</p>
           <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <ScanLine className="w-10 h-10 text-emerald-600" />
           </div>
@@ -383,6 +512,126 @@ export default function App() {
           >
             <LogIn className="w-5 h-5" />
             Masuk dengan Google
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Pilih Dinas atau Register SKPD baru
+  if (!userProfile?.dinasId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-stone-50 p-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 border border-stone-200"
+        >
+          <div className="text-center mb-6">
+            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em] mb-4">SISTEM MULTI DINAS / SKPD</p>
+            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Users className="w-8 h-8 text-emerald-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-stone-900">Pilih Dinas / SKPD</h1>
+            <p className="text-stone-500 text-sm mt-2">
+              Hubungkan akun Anda dengan Dinas/SKPD pilihan Anda atau buat Dinas/SKPD baru jika Anda adalah Admin/Pengelola Dinas.
+            </p>
+          </div>
+
+          {!isRegisteringDinas ? (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Pilih Dinas / SKPD Terdaftar</label>
+                <select
+                  value={selectedDinasId}
+                  onChange={(e) => setSelectedDinasId(e.target.value)}
+                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none"
+                >
+                  <option value="">-- Pilih Dinas / SKPD --</option>
+                  {dinases.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedDinasId && (
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <button
+                    onClick={() => {
+                      const matched = dinases.find(d => d.id === selectedDinasId);
+                      if (matched) handleSelectDinas(matched, 'employee');
+                    }}
+                    disabled={dinasLoading}
+                    className="flex flex-col items-center justify-center p-4 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 text-emerald-700 rounded-2xl transition-all"
+                  >
+                    <span className="font-bold text-sm">Masuk Sebagai</span>
+                    <span className="text-xs opacity-85 mt-1">Pegawai</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      const matched = dinases.find(d => d.id === selectedDinasId);
+                      if (matched) handleSelectDinas(matched, 'admin');
+                    }}
+                    disabled={dinasLoading}
+                    className="flex flex-col items-center justify-center p-4 bg-stone-900 hover:bg-stone-800 border border-stone-800 text-white rounded-2xl transition-all"
+                  >
+                    <span className="font-bold text-sm">Masuk Sebagai</span>
+                    <span className="text-xs opacity-85 mt-1">Admin Dinas</span>
+                  </button>
+                </div>
+              )}
+
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-stone-200"></div>
+                <span className="flex-shrink mx-4 text-stone-400 text-xs">Atau</span>
+                <div className="flex-grow border-t border-stone-200"></div>
+              </div>
+
+              <button
+                onClick={() => setIsRegisteringDinas(true)}
+                className="w-full py-3 text-center text-sm font-semibold text-emerald-600 hover:text-emerald-700 border border-emerald-100 hover:border-emerald-200 rounded-xl transition-all"
+              >
+                + Daftarkan Dinas / SKPD Baru
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleCreateDinas} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Nama Dinas / SKPD Baru</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="Contoh: Dinas Kelautan & Perikanan NTB"
+                  value={newDinasName}
+                  onChange={(e) => setNewDinasName(e.target.value)}
+                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRegisteringDinas(false)}
+                  className="flex-1 py-3 text-center text-sm font-semibold text-stone-500 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={dinasLoading || !newDinasName.trim()}
+                  className="flex-1 py-3 text-center text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-100 transition-all disabled:opacity-50"
+                >
+                  {dinasLoading ? 'Mendaftarkan...' : 'Daftar & Masuk'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          <button
+            onClick={handleLogout}
+            className="w-full mt-6 text-stone-400 text-xs hover:text-stone-600 transition-all text-center"
+          >
+            Keluar dan gunakan akun lain
           </button>
         </motion.div>
       </div>
@@ -555,12 +804,40 @@ export default function App() {
       <nav className="bg-white border-b border-stone-200 px-4 py-3 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex flex-col">
-            <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest leading-none mb-1.5 ml-1">Kesbangpoldagri NTB</span>
+            <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest leading-none mb-1.5 ml-1">
+              {userProfile?.dinasName || 'Kesbangpoldagri NTB'}
+            </span>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100">
                 <ScanLine className="w-6 h-6 text-white" />
               </div>
-              <span className="font-bold text-xl text-stone-900 hidden sm:block">Absensi Pegawai</span>
+              <div className="flex flex-col sm:flex-row sm:items-center">
+                <span className="font-bold text-base sm:text-xl text-stone-900 leading-tight">Absensi Pegawai</span>
+                {user.email?.toLowerCase().trim() === 'noviharyanto062@gmail.com' && (
+                  <select
+                    value={userProfile?.dinasId || 'kesbangpol'}
+                    onChange={async (e) => {
+                      const selectedId = e.target.value;
+                      const matched = dinases.find(d => d.id === selectedId);
+                      if (matched) {
+                        const updated = {
+                          ...userProfile,
+                          dinasId: matched.id,
+                          dinasName: matched.name,
+                          role: 'admin'
+                        };
+                        setUserProfile(updated);
+                        await setDoc(doc(db, 'users', user.uid), updated);
+                      }
+                    }}
+                    className="sm:ml-3 mt-1 sm:mt-0 text-[11px] font-medium text-stone-600 bg-stone-50 border border-stone-200 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    {dinases.map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
           </div>
 
@@ -623,6 +900,7 @@ export default function App() {
             <span>UID: {user.uid}</span>
             <span>Email: {user.email}</span>
             <span>Admin: {isAdmin ? 'YES' : 'NO'}</span>
+            <span>Dinas: {userProfile?.dinasId}</span>
             <span>View: {view}</span>
           </div>
         )}
@@ -635,7 +913,7 @@ export default function App() {
               exit={{ opacity: 0, x: 20 }}
               className="h-full"
             >
-              <Scanner />
+              <Scanner dinasId={userProfile?.dinasId} settingsProp={settings} />
             </motion.div>
           ) : (
             <motion.div
@@ -645,7 +923,7 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               className="h-full"
             >
-              <AdminPortal />
+              <AdminPortal dinasId={userProfile?.dinasId} dinasName={userProfile?.dinasName} />
             </motion.div>
           )}
         </AnimatePresence>

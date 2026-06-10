@@ -96,11 +96,19 @@ export async function recordAttendance(
       }
     }
 
-    // 1. Find employee by employeeId
+    // 1. Find employee by employeeId (filtered by dinasId if available for multi-SKPD support)
+    const currentDinasId = settings?.dinasId || userProfile?.dinasId || 'kesbangpol';
+    const currentDinasName = settings?.dinasName || userProfile?.dinasName || 'Kesbangpoldagri NTB';
     const employeesRef = collection(db, 'employees');
-    const q = query(employeesRef, where('employeeId', '==', targetEmployeeId));
+    let q = query(employeesRef, where('employeeId', '==', targetEmployeeId), where('dinasId', '==', currentDinasId));
     
-    const querySnapshot = await getDocs(q);
+    let querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      // Fallback search without dinasId for backwards-compatibility
+      const qFallback = query(employeesRef, where('employeeId', '==', targetEmployeeId));
+      querySnapshot = await getDocs(qFallback);
+    }
 
     if (querySnapshot.empty) {
       return { success: false, message: 'Pegawai tidak ditemukan. Silakan hubungi admin.' };
@@ -184,7 +192,9 @@ export async function recordAttendance(
       method: methodVal,
       isLate,
       isEarlyLeave,
-      syncedToSheets: false
+      syncedToSheets: false,
+      dinasId: currentDinasId,
+      dinasName: currentDinasName
     });
 
     return {

@@ -14,9 +14,10 @@ interface Employee {
   department: string;
   position: string;
   createdAt: any;
+  dinasId?: string;
 }
 
-export default function EmployeeManagement() {
+export default function EmployeeManagement({ dinasId }: { dinasId?: string }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -37,11 +38,12 @@ export default function EmployeeManagement() {
 
   useEffect(() => {
     const fetchSettings = async () => {
-      const settingsDoc = await getDoc(doc(db, 'settings', 'config'));
+      const currentDinasId = dinasId || 'kesbangpol';
+      const settingsDoc = await getDoc(doc(db, 'settings', currentDinasId));
       if (settingsDoc.exists()) setSettings(settingsDoc.data());
     };
     fetchSettings();
-  }, []);
+  }, [dinasId]);
 
   const handleManualAttendance = async (employee: Employee) => {
     if (!window.confirm(`Catat absensi manual untuk ${employee.name}?`)) return;
@@ -62,17 +64,20 @@ export default function EmployeeManagement() {
   };
 
   useEffect(() => {
-    console.log('EmployeeManagement: Checking data...');
+    const currentDinasId = dinasId || 'kesbangpol';
+    console.log('EmployeeManagement: Checking data for dinasId:', currentDinasId);
     const q = query(collection(db, 'employees'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       console.log('EmployeeManagement: Received snapshot, size:', snapshot.size);
-      const sortedEmployees = snapshot.docs
+      const filtered = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Employee))
-        .sort((a, b) => {
-          const timeA = a.createdAt?.toMillis?.() || 0;
-          const timeB = b.createdAt?.toMillis?.() || 0;
-          return timeB - timeA;
-        });
+        .filter(emp => emp.dinasId === currentDinasId || (!emp.dinasId && currentDinasId === 'kesbangpol'));
+
+      const sortedEmployees = filtered.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis?.() || 0;
+        const timeB = b.createdAt?.toMillis?.() || 0;
+        return timeB - timeA;
+      });
       setEmployees(sortedEmployees);
       setLoading(false);
       setError(null);
@@ -82,7 +87,7 @@ export default function EmployeeManagement() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [dinasId]);
 
   const handleOpenModal = (employee?: Employee) => {
     if (employee) {
@@ -106,10 +111,12 @@ export default function EmployeeManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    const currentDinasId = dinasId || 'kesbangpol';
     try {
       const normalizedData = {
         ...formData,
-        email: formData.email.toLowerCase().trim()
+        email: formData.email.toLowerCase().trim(),
+        dinasId: currentDinasId
       };
 
       if (selectedEmployee) {
