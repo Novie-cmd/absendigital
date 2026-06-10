@@ -30,6 +30,25 @@ export default function Settings({ dinasId, dinasName }: { dinasId?: string; din
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [resolvedDinasName, setResolvedDinasName] = useState<string>('');
+
+  useEffect(() => {
+    const currentDinasId = dinasId || 'kesbangpol';
+    const fetchDinasName = async () => {
+      try {
+        const dSnap = await getDoc(doc(db, 'dinases', currentDinasId));
+        if (dSnap.exists()) {
+          setResolvedDinasName(dSnap.data().name);
+        } else {
+          setResolvedDinasName(dinasName || 'Kesbangpoldagri NTB');
+        }
+      } catch (err) {
+        console.error('Error fetching dinas name from db:', err);
+        setResolvedDinasName(dinasName || 'Kesbangpoldagri NTB');
+      }
+    };
+    fetchDinasName();
+  }, [dinasId, dinasName]);
 
   useEffect(() => {
     const currentDinasId = dinasId || 'kesbangpol';
@@ -53,10 +72,12 @@ export default function Settings({ dinasId, dinasName }: { dinasId?: string; din
     setSaving(true);
     setMessage(null);
     const currentDinasId = dinasId || 'kesbangpol';
+    const nameOfDinas = resolvedDinasName || dinasName || "Kesbangpoldagri NTB";
     try {
       await setDoc(doc(db, 'settings', currentDinasId), {
         ...settings,
-        dinasId: currentDinasId
+        dinasId: currentDinasId,
+        dinasName: nameOfDinas
       }, { merge: true });
       setMessage({ type: 'success', text: 'Pengaturan berhasil disimpan!' });
       setTimeout(() => setMessage(null), 3000);
@@ -139,7 +160,7 @@ export default function Settings({ dinasId, dinasName }: { dinasId?: string; din
     
     setCreatingSheet(true);
     const currentDinasId = dinasId || 'kesbangpol';
-    const nameOfDinas = dinasName || (settings as any).dinasName || "Kesbangpoldagri NTB";
+    const nameOfDinas = resolvedDinasName || dinasName || (settings as any).dinasName || "Kesbangpoldagri NTB";
     try {
       const sheetInfo = await createSpreadsheet(googleAuthToken, `Data Absensi ${nameOfDinas}`);
       const updatedSettings = {
@@ -153,7 +174,8 @@ export default function Settings({ dinasId, dinasName }: { dinasId?: string; din
       // Save directly to firestore
       await setDoc(doc(db, 'settings', currentDinasId), {
         ...updatedSettings,
-        dinasId: currentDinasId
+        dinasId: currentDinasId,
+        dinasName: nameOfDinas
       }, { merge: true });
       alert("Berhasil membuat Google Sheets baru untuk absensi!");
     } catch (err: any) {
