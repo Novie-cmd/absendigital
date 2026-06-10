@@ -1,106 +1,77 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: employees
-    // Fields:
-    //   - name: string (required)
-    //   - employeeId: string (required, unique)
-    //   - department: string
-    //   - position: string
-    //   - createdAt: timestamp
-    //
-    // Collection: attendance
-    // Fields:
-    //   - employeeId: string (required)
-    //   - employeeName: string
-    //   - type: string (in/out)
-    //   - timestamp: timestamp
-    //   - date: string (YYYY-MM-DD)
-    //
-    // Collection: settings
-    // Fields:
-    //   - workStartTime: string (HH:mm)
-    //   - workEndTime: string (HH:mm)
-    //   - lateThreshold: number
-    //
-    // ===============================================================
+    // Default-deny catch-all safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
 
     // ===============================================================
-    // Helper Functions
+    // Helper Functions & Hardening
     // ===============================================================
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isAdmin() {
+    function isGlobalAdmin() {
       return isAuthenticated() &&
         request.auth.token.email != null &&
         request.auth.token.email == 'noviharyanto062@gmail.com';
     }
 
-    function isValidEmployee(data) {
-      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.employeeId is string && data.employeeId.size() > 0 && data.employeeId.size() < 50 &&
-             (data.get('email', null) == null || (data.email is string && data.email.size() < 100)) &&
-             (data.get('department', null) == null || (data.department is string && data.department.size() < 100)) &&
-             (data.get('position', null) == null || (data.position is string && data.position.size() < 100)) &&
-             (data.get('createdAt', null) == null || (data.createdAt is timestamp || data.createdAt == null));
+    // Verify if the user is a designated administrator for the given dinasId
+    function isDinasAdminOf(dinasId) {
+      return isAuthenticated() && (
+        request.auth.token.email == 'noviharyanto062@gmail.com' || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin' &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('dinasId', 'kesbangpol') == dinasId
+        )
+      );
     }
 
-    function isValidAttendance(data) {
-      return data.employeeId is string && data.employeeId.size() > 0 &&
-             data.type in ['in', 'out'] &&
-             data.timestamp is timestamp &&
-             data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$");
-    }
-
-    function isValidSetting(data) {
-      return data.workStartTimeMonThu is string && data.workStartTimeMonThu.matches("^\\d{2}:\\d{2}$") &&
-             data.workEndTimeMonThu is string && data.workEndTimeMonThu.matches("^\\d{2}:\\d{2}$") &&
-             data.workStartTimeFri is string && data.workStartTimeFri.matches("^\\d{2}:\\d{2}$") &&
-             data.workEndTimeFri is string && data.workEndTimeFri.matches("^\\d{2}:\\d{2}$") &&
-             data.lateThreshold is number &&
-             (data.get('useGeofencing', null) == null || data.useGeofencing is bool) &&
-             (data.get('officeLat', null) == null || data.officeLat is number) &&
-             (data.get('officeLng', null) == null || data.officeLng is number) &&
-             (data.get('officeRadius', null) == null || data.officeRadius is number) &&
-             (data.get('officeQrToken', null) == null || data.officeQrToken is string) &&
-             (data.get('useGoogleSheets', null) == null || data.useGoogleSheets is bool) &&
-             (data.get('spreadsheetId', null) == null || data.spreadsheetId is string) &&
-             (data.get('spreadsheetUrl', null) == null || data.spreadsheetUrl is string);
-    }
-
-    function isValidUser(data) {
-      return data.email is string && 
-             (data.get('role', null) == null || (data.role in ['admin', 'employee']));
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     // ===============================================================
-    // Rules
+    // Collection Rules
     // ===============================================================
 
     match /users/{userId} {
-      allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      // Users can manage their own profiles; global admins can access all profiles
+      allow read, write: if isAuthenticated() && (request.auth.uid == userId || isGlobalAdmin());
     }
 
     match /employees/{employeeId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow get, list: if true;
+      allow create: if isDinasAdminOf(request.resource.data.get('dinasId', 'kesbangpol'));
+      allow update: if isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol')) &&
+                       isDinasAdminOf(request.resource.data.get('dinasId', 'kesbangpol'));
+      allow delete: if isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol'));
     }
 
     match /attendance/{attendanceId} {
-      allow create: if true;
-      allow read: if true;
-      allow update, delete: if isAdmin();
+      allow get, list: if true;
+      allow create: if true; // Front gate scanning is accessible
+      allow update: if isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol')) &&
+                       isDinasAdminOf(request.resource.data.get('dinasId', 'kesbangpol'));
+      allow delete: if isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol'));
     }
 
-    match /settings/{settingId} {
+    match /settings/{dinasId} {
       allow read: if true;
-      allow write: if isAdmin();
+      // Allow creation of configuration documents on registration/initialization
+      allow create: if isAuthenticated();
+      // Only Dinas admin of this settings document can modify settings
+      allow update: if isDinasAdminOf(dinasId);
+      allow delete: if isGlobalAdmin();
+    }
+
+    match /dinases/{dinasId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isGlobalAdmin();
     }
 
     match /test_connection/{testId} {

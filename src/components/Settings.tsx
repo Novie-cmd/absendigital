@@ -138,8 +138,10 @@ export default function Settings({ dinasId }: { dinasId?: string }) {
     }
     
     setCreatingSheet(true);
+    const currentDinasId = dinasId || 'kesbangpol';
+    const nameOfDinas = (settings as any).dinasName || "Kesbangpoldagri NTB";
     try {
-      const sheetInfo = await createSpreadsheet(googleAuthToken, "Data Absensi Kesbangpoldagri NTB");
+      const sheetInfo = await createSpreadsheet(googleAuthToken, `Data Absensi ${nameOfDinas}`);
       const updatedSettings = {
         ...settings,
         useGoogleSheets: true,
@@ -149,7 +151,10 @@ export default function Settings({ dinasId }: { dinasId?: string }) {
       setSettings(updatedSettings);
       
       // Save directly to firestore
-      await setDoc(doc(db, 'settings', 'config'), updatedSettings);
+      await setDoc(doc(db, 'settings', currentDinasId), {
+        ...updatedSettings,
+        dinasId: currentDinasId
+      }, { merge: true });
       alert("Berhasil membuat Google Sheets baru untuk absensi!");
     } catch (err: any) {
       console.error("Error creating sheet:", err);
