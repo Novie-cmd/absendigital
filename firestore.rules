@@ -16,16 +16,18 @@ service cloud.firestore {
     function isGlobalAdmin() {
       return isAuthenticated() &&
         request.auth.token.email != null &&
-        request.auth.token.email == 'noviharyanto062@gmail.com';
+        (request.auth.token.email == 'noviharyanto062@gmail.com' || request.auth.token.email.lower() == 'noviharyanto062@gmail.com');
     }
 
     // Verify if the user is a designated administrator for the given dinasId
     function isDinasAdminOf(dinasId) {
       return isAuthenticated() && (
-        (request.auth.token.email != null && request.auth.token.email == 'noviharyanto062@gmail.com') || (
+        isGlobalAdmin() || (
           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin' &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('dinasId', '') == dinasId
+          ('role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+          ('dinasId' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.dinasId == dinasId
         )
       );
     }
@@ -45,18 +47,22 @@ service cloud.firestore {
 
     match /employees/{employeeId} {
       allow get, list: if true;
-      allow create: if isDinasAdminOf(request.resource.data.get('dinasId', 'kesbangpol'));
-      allow update: if isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol')) &&
-                       isDinasAdminOf(request.resource.data.get('dinasId', 'kesbangpol'));
-      allow delete: if isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol'));
+      allow create: if isGlobalAdmin() || isDinasAdminOf('dinasId' in request.resource.data ? request.resource.data.dinasId : 'kesbangpol');
+      allow update: if isGlobalAdmin() || (
+                       isDinasAdminOf('dinasId' in resource.data ? resource.data.dinasId : 'kesbangpol') &&
+                       isDinasAdminOf('dinasId' in request.resource.data ? request.resource.data.dinasId : 'kesbangpol')
+                    );
+      allow delete: if isGlobalAdmin() || isDinasAdminOf('dinasId' in resource.data ? resource.data.dinasId : 'kesbangpol');
     }
 
     match /attendance/{attendanceId} {
       allow get, list: if true;
       allow create: if true; // Front gate scanning is accessible
-      allow update: if isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol')) &&
-                       isDinasAdminOf(request.resource.data.get('dinasId', 'kesbangpol'));
-      allow delete: if isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol'));
+      allow update: if isGlobalAdmin() || (
+                       isDinasAdminOf('dinasId' in resource.data ? resource.data.dinasId : 'kesbangpol') &&
+                       isDinasAdminOf('dinasId' in request.resource.data ? request.resource.data.dinasId : 'kesbangpol')
+                    );
+      allow delete: if isGlobalAdmin() || isDinasAdminOf('dinasId' in resource.data ? resource.data.dinasId : 'kesbangpol');
     }
 
     match /settings/{dinasId} {
@@ -64,7 +70,7 @@ service cloud.firestore {
       // Allow creation of configuration documents on registration/initialization
       allow create: if isAuthenticated();
       // Only Dinas admin of this settings document can modify settings
-      allow update: if isDinasAdminOf(dinasId);
+      allow update: if isGlobalAdmin() || isDinasAdminOf(dinasId);
       allow delete: if isGlobalAdmin();
     }
 
