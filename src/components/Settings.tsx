@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { getGoogleToken, setGoogleToken, createSpreadsheet, verifySpreadsheetAccess } from '../utils/googleSheets';
 
-export default function Settings({ dinasId }: { dinasId?: string }) {
+export default function Settings({ dinasId, dinasName }: { dinasId?: string; dinasName?: string }) {
   const [settings, setSettings] = useState({
     workStartTimeMonThu: '08:00',
     workEndTimeMonThu: '17:00',
@@ -139,7 +139,7 @@ export default function Settings({ dinasId }: { dinasId?: string }) {
     
     setCreatingSheet(true);
     const currentDinasId = dinasId || 'kesbangpol';
-    const nameOfDinas = (settings as any).dinasName || "Kesbangpoldagri NTB";
+    const nameOfDinas = dinasName || (settings as any).dinasName || "Kesbangpoldagri NTB";
     try {
       const sheetInfo = await createSpreadsheet(googleAuthToken, `Data Absensi ${nameOfDinas}`);
       const updatedSettings = {

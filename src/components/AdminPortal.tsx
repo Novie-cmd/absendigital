@@ -132,7 +132,7 @@ export default function AdminPortal({ dinasId, dinasName }: { dinasId?: string; 
       <div className="flex-1 min-w-0">
         {activeView === 'dashboard' && <Dashboard dinasId={dinasId} />}
         {activeView === 'employees' && <EmployeeManagement dinasId={dinasId} />}
-        {activeView === 'settings' && <Settings dinasId={dinasId} />}
+        {activeView === 'settings' && <Settings dinasId={dinasId} dinasName={dinasName} />}
         {activeView === 'reports' && <Reports dinasId={dinasId} />}
       </div>
     </div>
