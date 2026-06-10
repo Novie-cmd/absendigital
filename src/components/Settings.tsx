@@ -504,6 +504,18 @@ export default function Settings({ dinasId, dinasName }: { dinasId?: string; din
               </button>
             </div>
 
+            {/* AI Studio / Iframe Hint */}
+            {window.self !== window.top && !googleAuthToken && (
+              <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-[11px] text-blue-700 space-y-1">
+                <p className="font-bold flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-500" /> Tips Preview AI Studio:
+                </p>
+                <p className="leading-relaxed">
+                  Karena batasan iFrame sandbox & popup blocker, silakan buka aplikasi ini di <strong>Tab Baru</strong> (klik tombol <ExternalLink className="w-3 h-3 inline pb-0.5" /> di pojok kanan atas panel preview) sebelum menekan tombol <strong>Hubungkan</strong> agar popup login Google dapat terbuka dengan sukses.
+                </p>
+              </div>
+            )}
+
             {/* Google Sheets Sync Toggles & Settings */}
             <div className="space-y-4 text-left">
               <div className="flex items-center justify-between">

@@ -16,7 +16,7 @@ service cloud.firestore {
     function isGlobalAdmin() {
       return isAuthenticated() &&
         request.auth.token.email != null &&
-        (request.auth.token.email == 'noviharyanto062@gmail.com' || request.auth.token.email.lower() == 'noviharyanto062@gmail.com');
+        request.auth.token.email == 'noviharyanto062@gmail.com';
     }
 
     // Verify if the user is a designated administrator for the given dinasId
