@@ -116,6 +116,7 @@ export default function EmployeeManagement({ dinasId }: { dinasId?: string }) {
       const normalizedData = {
         ...formData,
         email: formData.email.toLowerCase().trim(),
+        employeeId: formData.employeeId.trim(),
         dinasId: currentDinasId
       };
 

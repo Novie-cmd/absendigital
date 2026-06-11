@@ -350,14 +350,18 @@ export default function Scanner({ dinasId, settingsProp }: { dinasId?: string; s
                 </>
               )}
 
-              <button
-                onClick={() => {
-                  window.location.href = 'https://www.google.com';
-                }}
-                className="mt-8 bg-stone-900 hover:bg-stone-800 text-white font-semibold py-3 px-8 rounded-xl transition-all shadow-lg"
-              >
-                Selesai
-              </button>
+              <div className="flex gap-4 mt-8">
+                <button
+                  onClick={resetScanner}
+                  className={`py-3 px-8 rounded-xl font-semibold transition-all shadow-lg text-white ${
+                    scanResult?.success 
+                      ? 'bg-emerald-600 hover:bg-emerald-500' 
+                      : 'bg-stone-900 hover:bg-stone-800'
+                  }`}
+                >
+                  {scanResult?.success ? 'Scan Berikutnya' : 'Coba Lagi'}
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

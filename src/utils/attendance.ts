@@ -48,11 +48,12 @@ export async function recordAttendance(
   userLocation?: { lat: number; lng: number } | null
 ): Promise<AttendanceResult> {
   try {
-    let targetEmployeeId = decodedText;
+    const cleanedText = decodedText ? decodedText.trim() : '';
+    let targetEmployeeId = cleanedText;
     let targetEmployeeName = '';
 
     // Check if it's an Office QR scan by an employee
-    if (decodedText === settings?.officeQrToken) {
+    if (cleanedText === (settings?.officeQrToken ? settings.officeQrToken.trim() : '')) {
       // 0. Check Location if Geofencing is enabled
       if (settings?.useGeofencing && settings?.officeLat && settings?.officeLng) {
         if (!userLocation) {
@@ -182,7 +183,7 @@ export async function recordAttendance(
     }
 
     // 4. Record attendance
-    const methodVal = decodedText === settings?.officeQrToken ? 'self_scan' : 'admin_scan';
+    const methodVal = cleanedText === (settings?.officeQrToken ? settings.officeQrToken.trim() : '') ? 'self_scan' : 'admin_scan';
     const newDocRef = await addDoc(attendanceRef, {
       employeeId: targetEmployeeId,
       employeeName: targetEmployeeName,
