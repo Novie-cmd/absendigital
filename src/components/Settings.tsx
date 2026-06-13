@@ -6,6 +6,7 @@ import { Clock, Save, AlertCircle, CheckCircle2, QrCode, Download, MapPin, Navig
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { getGoogleToken, setGoogleToken, createSpreadsheet, verifySpreadsheetAccess } from '../utils/googleSheets';
+import { handleFirestoreError, OperationType } from '../utils/firestoreError';
 
 export default function Settings({ dinasId, dinasName }: { dinasId?: string; dinasName?: string }) {
   const [settings, setSettings] = useState({
@@ -45,6 +46,11 @@ export default function Settings({ dinasId, dinasName }: { dinasId?: string; din
       } catch (err) {
         console.error('Error fetching dinas name from db:', err);
         setResolvedDinasName(dinasName || 'Kesbangpoldagri NTB');
+        try {
+          handleFirestoreError(err, OperationType.GET, 'dinases/' + currentDinasId);
+        } catch (e) {
+          // Silent catch for UI stability, serialized logs are printed
+        }
       }
     };
     fetchDinasName();
@@ -63,6 +69,11 @@ export default function Settings({ dinasId, dinasName }: { dinasId?: string; din
       console.error('Settings: Snapshot error:', err);
       setError('Gagal memuat pengaturan. Pastikan Anda memiliki izin yang cukup.');
       setLoading(false);
+      try {
+        handleFirestoreError(err, OperationType.GET, 'settings/' + currentDinasId);
+      } catch (e) {
+        // Silent catch for UI stability, serialized logs are printed
+      }
     });
     return () => unsubscribe();
   }, [dinasId]);
