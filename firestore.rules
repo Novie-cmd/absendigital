@@ -14,9 +14,12 @@ service cloud.firestore {
     }
 
     function isGlobalAdmin() {
-      return isAuthenticated() &&
-        request.auth.token.email != null &&
-        request.auth.token.email == 'noviharyanto062@gmail.com';
+      return isAuthenticated() && (
+        (request.auth.token.email != null && request.auth.token.email == 'noviharyanto062@gmail.com') ||
+        (request.auth.uid == 'MqDnO7Fd3yXhqeUghobWc2F55eh1') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('email', '') == 'noviharyanto062@gmail.com')
+      );
     }
 
     // Verify if the user is a designated administrator for the given dinasId
@@ -74,7 +77,12 @@ service cloud.firestore {
       // Allow creation of configuration documents on registration/initialization
       allow create: if isAuthenticated();
       // Only Dinas admin of this settings document can modify settings
-      allow update: if isGlobalAdmin() || isDinasAdminOf(dinasId);
+      allow update: if isAuthenticated() && (
+        isGlobalAdmin() ||
+        isDinasAdminOf(dinasId) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('dinasId', '') == dinasId)
+      );
       allow delete: if isGlobalAdmin();
     }
 
