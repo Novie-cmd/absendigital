@@ -15,6 +15,7 @@ interface Employee {
   position: string;
   createdAt: any;
   dinasId?: string;
+  role?: 'admin' | 'employee';
 }
 
 export default function EmployeeManagement({ dinasId }: { dinasId?: string }) {
@@ -28,7 +29,8 @@ export default function EmployeeManagement({ dinasId }: { dinasId?: string }) {
     email: '',
     employeeId: '',
     department: '',
-    position: ''
+    position: '',
+    role: 'employee'
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,11 +99,12 @@ export default function EmployeeManagement({ dinasId }: { dinasId?: string }) {
         email: employee.email || '',
         employeeId: employee.employeeId,
         department: employee.department,
-        position: employee.position
+        position: employee.position,
+        role: employee.role || 'employee'
       });
     } else {
       setSelectedEmployee(null);
-      setFormData({ name: '', email: '', employeeId: '', department: '', position: '' });
+      setFormData({ name: '', email: '', employeeId: '', department: '', position: '', role: 'employee' });
     }
     setIsModalOpen(true);
   };
@@ -229,7 +232,16 @@ export default function EmployeeManagement({ dinasId }: { dinasId?: string }) {
                         <div className="w-10 h-10 bg-stone-100 rounded-xl flex items-center justify-center text-stone-500 font-bold">
                           {emp.name.charAt(0)}
                         </div>
-                        <span className="font-bold text-stone-900">{emp.name}</span>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-stone-900 flex items-center gap-1.5 flex-wrap">
+                            {emp.name}
+                            {emp.role === 'admin' && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 leading-none">
+                                Admin
+                              </span>
+                            )}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-stone-500 text-sm">{emp.email || '-'}</td>
@@ -320,6 +332,17 @@ export default function EmployeeManagement({ dinasId }: { dinasId?: string }) {
                       placeholder="email@example.com"
                       className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-stone-700 mb-1">Peran / Hak Akses</label>
+                    <select
+                      value={formData.role}
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                      className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none"
+                    >
+                      <option value="employee">Pegawai Biasa (Akses Absensi)</option>
+                      <option value="admin">Administrator (Akses Portal Admin Dinas)</option>
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-stone-700 mb-1">ID Pegawai (Barcode)</label>

@@ -86,50 +86,60 @@ export default function App() {
     // Fetch user profile and settings from Firestore
     const fetchData = async () => {
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        let currentProfile = null;
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        let currentProfile = userDoc.exists() ? userDoc.data() : null;
 
-        if (userDoc.exists()) {
-          currentProfile = userDoc.data();
-          setUserProfile(currentProfile);
-          if (currentProfile.role === 'admin' || userEmail === adminEmail) setIsAdmin(true);
-          if (currentProfile.employeeId) setEmployeeId(currentProfile.employeeId);
-        } else {
-          // SEAMLESS AUTO-LINK: Check if email exists in employees collection
-          const employeesRef = collection(db, 'employees');
-          const q = query(employeesRef, where('email', '==', userEmail));
-          const snap = await getDocs(q);
+        // SEAMLESS AUTO-LINK & ROLE/SKPD SYNCHRONIZATION: Check if email exists in employees collection
+        const employeesRef = collection(db, 'employees');
+        const q = query(employeesRef, where('email', '==', userEmail));
+        const snap = await getDocs(q);
+        
+        if (!snap.empty) {
+          const employeeData = snap.docs[0].data();
+          const targetDinasId = employeeData.dinasId || 'kesbangpol';
+          const targetDinasName = employeeData.dinasName || 'Kesbangpoldagri NTB';
+          const targetRole = employeeData.role === 'admin' || userEmail === adminEmail ? 'admin' : 'employee';
+          const targetEmployeeId = employeeData.employeeId || '';
+          const targetEmployeeName = employeeData.name || '';
           
-          if (!snap.empty) {
-            const employeeData = snap.docs[0].data();
-            const newProfile = {
+          // Sync profile to match employee record if there's any update
+          const needsSync = !currentProfile ||
+            currentProfile.dinasId !== targetDinasId ||
+            currentProfile.role !== targetRole ||
+            currentProfile.employeeId !== targetEmployeeId ||
+            currentProfile.employeeName !== targetEmployeeName;
+
+          if (needsSync) {
+            console.log('Synchronizing user profile with employee record for email:', userEmail);
+            const syncedProfile = {
               email: user.email,
               name: user.displayName,
-              employeeId: employeeData.employeeId,
-              employeeName: employeeData.name,
-              dinasId: employeeData.dinasId || 'kesbangpol',
-              dinasName: employeeData.dinasName || 'Kesbangpoldagri NTB',
-              role: userEmail === adminEmail ? 'admin' : 'employee',
+              employeeId: targetEmployeeId,
+              employeeName: targetEmployeeName,
+              dinasId: targetDinasId,
+              dinasName: targetDinasName,
+              role: targetRole,
               updatedAt: serverTimestamp()
             };
-            
-            console.log('Attempting seamless link for UID:', user.uid);
-            try {
-              await setDoc(doc(db, 'users', user.uid), newProfile);
-              setUserProfile(newProfile);
-              setEmployeeId(employeeData.employeeId);
-              if (newProfile.role === 'admin' || userEmail === adminEmail) setIsAdmin(true);
-              console.log('Seamlessly linked account for:', employeeData.name);
-            } catch (err: any) {
-              console.error('Error during seamless link:', err);
-              // Don't throw here, just let the user try manual link
-            }
+            await setDoc(userDocRef, syncedProfile, { merge: true });
+            currentProfile = syncedProfile;
           }
         }
 
-        // Settings are loaded inside the real-time subscription effect below
+        if (currentProfile) {
+          setUserProfile(currentProfile);
+          if (currentProfile.role === 'admin' || userEmail === adminEmail) {
+            setIsAdmin(true);
+          } else {
+            setIsAdmin(false);
+          }
+          if (currentProfile.employeeId) {
+            setEmployeeId(currentProfile.employeeId);
+          }
+        }
       } catch (err) {
-        console.error('Data fetch error:', err);
+        console.error('Data sync and fetch error:', err);
       } finally {
         setLoading(false);
       }
