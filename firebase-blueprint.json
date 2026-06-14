@@ -57,12 +57,23 @@
         "role": { "type": "string", "enum": ["admin", "employee"] },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "Dinas": {
+      "title": "Dinas",
+      "description": "Dynamic SKPD/Dinas Registration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "name"]
     }
   },
   "firestore": {
     "/employees": { "schema": "Employee", "description": "Collection of employees" },
     "/attendance": { "schema": "Attendance", "description": "Collection of attendance records" },
     "/settings": { "schema": "Setting", "description": "App settings" },
-    "/users": { "schema": "User", "description": "Collection of users" }
+    "/users": { "schema": "User", "description": "Collection of users" },
+    "/dinases": { "schema": "Dinas", "description": "Dinas entries" }
   }
 }

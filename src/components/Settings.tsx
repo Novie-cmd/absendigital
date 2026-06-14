@@ -61,7 +61,15 @@ export default function Settings({ dinasId, dinasName }: { dinasId?: string; din
     const unsubscribe = onSnapshot(doc(db, 'settings', currentDinasId), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setSettings(prev => ({ ...prev, ...data }));
+        let updatedToken = data.officeQrToken;
+        if (!updatedToken || updatedToken === 'OFFICE_ATTENDANCE_TOKEN_123') {
+          updatedToken = `token_${currentDinasId}_${Math.random().toString(36).substring(2, 11)}`;
+        }
+        setSettings(prev => ({ 
+          ...prev, 
+          ...data,
+          officeQrToken: updatedToken
+        }));
       }
       setLoading(false);
       setError(null);
@@ -468,10 +476,32 @@ export default function Settings({ dinasId, dinasName }: { dinasId?: string; din
           <p className="text-stone-400 text-sm max-w-xs">
             Cetak QR ini. Pegawai dapat melakukan scan menggunakan Google Lens atau kamera HP untuk langsung masuk ke sistem absensi.
           </p>
+
+          <div className="mt-4 w-full text-left bg-stone-50 p-4 rounded-2xl border border-stone-200 flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Token Barcode Aktif</span>
+              <button
+                onClick={() => {
+                  const currentDinasId = dinasId || 'kesbangpol';
+                  const newToken = `token_${currentDinasId}_${Math.random().toString(36).substring(2, 11)}`;
+                  setSettings(prev => ({ ...prev, officeQrToken: newToken }));
+                  alert("Token barcode baru digenerate! Jangan lupa klik 'Simpan Perubahan' di sebelah kiri untuk menyimpan perubahan ini.");
+                }}
+                type="button"
+                className="px-3 py-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all"
+              >
+                Regenerate Barcode
+              </button>
+            </div>
+            <div className="font-mono text-xs text-stone-600 bg-stone-100/50 p-2.5 rounded-xl break-all select-all border border-stone-100">
+              {settings.officeQrToken}
+            </div>
+          </div>
+
           <button
             onClick={downloadOfficeQR}
             type="button"
-            className="mt-8 w-full flex items-center justify-center gap-2 bg-emerald-600 text-white font-bold py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+            className="mt-6 w-full flex items-center justify-center gap-2 bg-emerald-600 text-white font-bold py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
           >
             <Download className="w-5 h-5" />
             Unduh QR Kantor

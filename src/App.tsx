@@ -10,6 +10,7 @@ import { recordAttendance, AttendanceResult } from './utils/attendance';
 import { setGoogleToken, getGoogleToken, appendAttendanceToSheet } from './utils/googleSheets';
 import { format } from 'date-fns';
 import { DEFAULT_DINAS_LIST, Dinas } from './utils/dinases';
+import { handleFirestoreError, OperationType } from './utils/firestoreError';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -192,37 +193,47 @@ export default function App() {
     e.preventDefault();
     if (!user || !newDinasName.trim()) return;
     setDinasLoading(true);
+    const generatedSlug = newDinasName.toLowerCase().trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+
+    const finalSlug = generatedSlug || `skpd-${Date.now()}`;
+    const generatedQrToken = `token_${finalSlug}_${Math.random().toString(36).substring(2, 11)}`;
+
     try {
-      const generatedSlug = newDinasName.toLowerCase().trim()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-');
-
-      const finalSlug = generatedSlug || `skpd-${Date.now()}`;
-
       // 1. Create settings document
-      await setDoc(doc(db, 'settings', finalSlug), {
-        dinasId: finalSlug,
-        dinasName: newDinasName.trim(),
-        workStartTimeMonThu: '08:00',
-        workEndTimeMonThu: '17:00',
-        workStartTimeFri: '08:00',
-        workEndTimeFri: '16:30',
-        lateThreshold: 15,
-        officeLat: 0,
-        officeLng: 0,
-        officeRadius: 100,
-        useGeofencing: false,
-        useGoogleSheets: false,
-        spreadsheetId: '',
-        spreadsheetUrl: ''
-      });
+      try {
+        await setDoc(doc(db, 'settings', finalSlug), {
+          dinasId: finalSlug,
+          dinasName: newDinasName.trim(),
+          workStartTimeMonThu: '08:00',
+          workEndTimeMonThu: '17:00',
+          workStartTimeFri: '08:00',
+          workEndTimeFri: '16:30',
+          lateThreshold: 15,
+          officeLat: 0,
+          officeLng: 0,
+          officeRadius: 100,
+          officeQrToken: generatedQrToken,
+          useGeofencing: false,
+          useGoogleSheets: false,
+          spreadsheetId: '',
+          spreadsheetUrl: ''
+        });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `settings/${finalSlug}`);
+      }
 
       // 2. Register Dinas
-      await setDoc(doc(db, 'dinases', finalSlug), {
-        id: finalSlug,
-        name: newDinasName.trim()
-      });
+      try {
+        await setDoc(doc(db, 'dinases', finalSlug), {
+          id: finalSlug,
+          name: newDinasName.trim()
+        });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `dinases/${finalSlug}`);
+      }
 
       // 3. Save profile
       const updatedProfile = {
@@ -235,13 +246,27 @@ export default function App() {
         updatedAt: serverTimestamp()
       };
 
-      await setDoc(doc(db, 'users', user.uid), updatedProfile);
+      try {
+        await setDoc(doc(db, 'users', user.uid), updatedProfile);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
+      }
+
       setUserProfile(updatedProfile);
       setIsAdmin(true);
       setEmployeeId('ADMIN_TEMP');
-    } catch (err) {
+    } catch (err: any) {
       console.error("Gagal meregistrasi Dinas baru:", err);
-      alert("Gagal meregistrasi Dinas baru");
+      let errorMessage = err.message || String(err);
+      try {
+        const parsed = JSON.parse(err.message);
+        if (parsed && parsed.error) {
+          errorMessage = parsed.error;
+        }
+      } catch (parseErr) {
+        // Not a JSON error string
+      }
+      alert(`Gagal meregistrasi Dinas baru: ${errorMessage}`);
     } finally {
       setDinasLoading(false);
     }
