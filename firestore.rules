@@ -24,10 +24,8 @@ service cloud.firestore {
       return isAuthenticated() && (
         isGlobalAdmin() || (
           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
-          'dinasId' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.dinasId == dinasId
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin' &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('dinasId', '') == dinasId
         )
       );
     }
@@ -48,21 +46,14 @@ service cloud.firestore {
     match /employees/{employeeId} {
       allow get, list: if true;
       allow create: if isGlobalAdmin() || (
-                       'dinasId' in request.resource.data &&
-                       isDinasAdminOf(request.resource.data.dinasId)
+                       isDinasAdminOf(request.resource.data.get('dinasId', 'kesbangpol'))
                     );
       allow update: if isGlobalAdmin() || (
-                       (
-                         !('dinasId' in resource.data) || 
-                         isDinasAdminOf(resource.data.dinasId)
-                       ) && (
-                         !('dinasId' in request.resource.data) ||
-                         isDinasAdminOf(request.resource.data.dinasId)
-                       )
+                       isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol')) &&
+                       isDinasAdminOf(request.resource.data.get('dinasId', 'kesbangpol'))
                     );
       allow delete: if isGlobalAdmin() || (
-                       !('dinasId' in resource.data) ||
-                       isDinasAdminOf(resource.data.dinasId)
+                       isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol'))
                     );
     }
 
@@ -70,17 +61,11 @@ service cloud.firestore {
       allow get, list: if true;
       allow create: if true; // Front gate scanning is accessible
       allow update: if isGlobalAdmin() || (
-                       (
-                         !('dinasId' in resource.data) ||
-                         isDinasAdminOf(resource.data.dinasId)
-                       ) && (
-                         !('dinasId' in request.resource.data) ||
-                         isDinasAdminOf(request.resource.data.dinasId)
-                       )
+                       isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol')) &&
+                       isDinasAdminOf(request.resource.data.get('dinasId', 'kesbangpol'))
                     );
       allow delete: if isGlobalAdmin() || (
-                       !('dinasId' in resource.data) ||
-                       isDinasAdminOf(resource.data.dinasId)
+                       isDinasAdminOf(resource.data.get('dinasId', 'kesbangpol'))
                     );
     }
 
