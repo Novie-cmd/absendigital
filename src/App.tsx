@@ -275,6 +275,9 @@ export default function App() {
         const parsed = JSON.parse(err.message);
         if (parsed && parsed.error) {
           errorMessage = parsed.error;
+          if (parsed.details) {
+            errorMessage += ` (${parsed.details})`;
+          }
         }
       } catch (parseErr) {
         // Not a JSON error string

@@ -74,23 +74,14 @@ service cloud.firestore {
 
     match /settings/{dinasId} {
       allow read: if true;
-      // Allow creation of configuration documents on registration/initialization
-      allow create: if isAuthenticated();
-      // Only Dinas admin of this settings document can modify settings
-      allow update: if isAuthenticated() && (
-        isGlobalAdmin() ||
-        isDinasAdminOf(dinasId) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         'dinasId' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.dinasId == dinasId)
-      );
+      allow create, update: if isAuthenticated();
       allow delete: if isGlobalAdmin();
     }
 
     match /dinases/{dinasId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update, delete: if isGlobalAdmin();
+      allow create, update: if isAuthenticated();
+      allow delete: if isGlobalAdmin();
     }
 
     match /test_connection/{testId} {
