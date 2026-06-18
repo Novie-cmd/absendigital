@@ -202,6 +202,19 @@ export default function App() {
     const generatedQrToken = `token_${finalSlug}_${Math.random().toString(36).substring(2, 11)}`;
 
     try {
+      // Check if Dinas or settings document already exists to provide a friendly error message
+      const dinasDocRef = doc(db, 'dinases', finalSlug);
+      const dinasDocSnap = await getDoc(dinasDocRef);
+      if (dinasDocSnap.exists()) {
+        throw new Error(`Dinas/SKPD "${newDinasName.trim()}" sudah terdaftar. Silakan pilih dari daftar yang ada atau gunakan nama lain.`);
+      }
+
+      const settingsDocRef = doc(db, 'settings', finalSlug);
+      const settingsDocSnap = await getDoc(settingsDocRef);
+      if (settingsDocSnap.exists()) {
+        throw new Error(`Dinas/SKPD "${newDinasName.trim()}" sudah terdaftar sebelumnya. Silakan pilih dari daftar yang ada atau gunakan nama lain.`);
+      }
+
       // 1. Create settings document
       try {
         await setDoc(doc(db, 'settings', finalSlug), {
