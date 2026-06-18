@@ -428,26 +428,54 @@ export default function App() {
     setLinking(true);
     const currentDinasId = userProfile?.dinasId || 'kesbangpol';
     const currentDinasName = userProfile?.dinasName || 'Kesbangpoldagri NTB';
+    const initialInput = linkId.trim();
     try {
       // 1. Verify if employeeId exists in employees collection for current Dinas
       let employeeData;
+      let resolvedLinkId = initialInput;
       try {
         const employeesRef = collection(db, 'employees');
-        let q = query(employeesRef, where('employeeId', '==', linkId.trim()), where('dinasId', '==', currentDinasId));
+        let q = query(employeesRef, where('employeeId', '==', initialInput), where('dinasId', '==', currentDinasId));
         let snap = await getDocs(q);
         
         if (snap.empty) {
           // Fallback search to find it without dinasId for backwards-compatibility
-          const qFallback = query(employeesRef, where('employeeId', '==', linkId.trim()));
+          const qFallback = query(employeesRef, where('employeeId', '==', initialInput));
           snap = await getDocs(qFallback);
         }
 
-        if (snap.empty) {
+        if (!snap.empty) {
+          employeeData = snap.docs[0].data();
+          resolvedLinkId = employeeData.employeeId;
+        } else {
+          // SMART FALLBACK: Match by normalized ID or substring in collection
+          const normalizedInput = initialInput.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+          if (normalizedInput) {
+            const allSnap = await getDocs(collection(db, 'employees'));
+            const foundDoc = allSnap.docs.find(doc => {
+              const data = doc.data();
+              const empId = (data.employeeId || '').toString().trim();
+              const empIdNormalized = empId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+              
+              if (empIdNormalized === normalizedInput) return true;
+              if (normalizedInput.length >= 4) {
+                return empIdNormalized.includes(normalizedInput) || normalizedInput.includes(empIdNormalized);
+              }
+              return false;
+            });
+            if (foundDoc) {
+              employeeData = foundDoc.data();
+              // Update resolved link ID to match the DB value
+              resolvedLinkId = employeeData.employeeId;
+            }
+          }
+        }
+
+        if (!employeeData) {
           alert(`ID Pegawai tidak ditemukan di dinas ${currentDinasName}. Silakan hubungi admin Anda.`);
           setLinking(false);
           return;
         }
-        employeeData = snap.docs[0].data();
       } catch (err: any) {
         console.error('Error querying employees:', err);
         throw new Error('Gagal memverifikasi NIP/NIK Pegawai: ' + err.message);
@@ -459,7 +487,7 @@ export default function App() {
         const updated = {
           email: user.email,
           name: user.displayName,
-          employeeId: linkId.trim(),
+          employeeId: resolvedLinkId,
           employeeName: employeeData.name,
           dinasId: currentDinasId,
           dinasName: currentDinasName,
@@ -473,7 +501,8 @@ export default function App() {
         throw new Error('Gagal menyimpan profil pengguna: ' + err.message);
       }
 
-      setEmployeeId(linkId.trim());
+      setEmployeeId(resolvedLinkId);
+      setLinkId(resolvedLinkId);
       alert(`Berhasil menghubungkan akun dengan ${employeeData.name}!`);
     } catch (error: any) {
       console.error('Linking error:', error);

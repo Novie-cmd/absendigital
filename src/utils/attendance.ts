@@ -111,11 +111,45 @@ export async function recordAttendance(
       querySnapshot = await getDocs(qFallback);
     }
 
-    if (querySnapshot.empty) {
-      return { success: false, message: 'Pegawai tidak ditemukan. Silakan hubungi admin.' };
+    let employee = null;
+    if (!querySnapshot.empty) {
+      employee = querySnapshot.docs[0].data();
+    } else {
+      // SMART FALLBACK: Match by normalized ID or substring to allow formatted inputs (dots, spaces, hyphens)
+      try {
+        const normalizedInput = targetEmployeeId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        if (normalizedInput) {
+          const allSnap = await getDocs(collection(db, 'employees'));
+          const foundDoc = allSnap.docs.find(doc => {
+            const data = doc.data();
+            const empId = (data.employeeId || '').toString().trim();
+            const empIdNormalized = empId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            
+            // Check exact normalized match
+            if (empIdNormalized === normalizedInput) return true;
+            
+            // Substring validation for IDs with length 4 or more to avoid false-positives
+            if (normalizedInput.length >= 4) {
+              return empIdNormalized.includes(normalizedInput) || normalizedInput.includes(empIdNormalized);
+            }
+            return false;
+          });
+          
+          if (foundDoc) {
+            employee = foundDoc.data();
+            // Override with correct canonical ID so attendance record associates correctly
+            targetEmployeeId = employee.employeeId;
+          }
+        }
+      } catch (err) {
+        console.error('Error during smart fallback employee search:', err);
+      }
     }
 
-    const employee = querySnapshot.docs[0].data();
+    if (!employee) {
+      return { success: false, message: `Pegawai dengan ID "${targetEmployeeId}" tidak ditemukan. Silakan hubungi admin.` };
+    }
+
     targetEmployeeName = employee.name;
     const today = format(new Date(), 'yyyy-MM-dd');
 

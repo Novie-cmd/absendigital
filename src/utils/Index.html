@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <base target="_top">
+    <title>Portal Absensi Kesbangpoldagri NTB</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f5f5f4; /* stone-100 */
+      }
+      .blur-backdrop {
+        backdrop-filter: blur(8px);
+      }
+    </style>
+  </head>
+  <body class="text-stone-800 antialiased min-h-screen">
+    
+    <!-- Top Decorative Gradient Line -->
+    <div class="h-2 w-full bg-gradient-to-r from-emerald-500 via-teal-600 to-slate-700"></div>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+      
+      <!-- App Header -->
+      <header class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8 bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center border border-emerald-100 shadow-inner">
+            <!-- Icon ID / Shield -->
+            <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+          <div class="text-left">
+            <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest px-2.5 py-0.5 bg-emerald-50 rounded-full border border-emerald-100/60 inline-block mb-1">Google Sheets Sync Hub</span>
+            <h1 class="text-xl font-extrabold text-stone-900 tracking-tight leading-none">Portal Absensi Kesbangpoldagri NTB</h1>
+            <p class="text-xs text-stone-400 mt-1">Integrasi sinkronisasi data real-time, trigger otomatis, dan kontrol data backup</p>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <!-- Active Badge -->
+          <div class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-semibold border border-emerald-100">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <span class="w-2 h-2 rounded-full bg-emerald-500 absolute"></span>
+            <span class="pl-2">Connected to Firestore</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Layout -->
+      <div id="loadingState" class="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-stone-200 shadow-sm">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
+        <p class="text-sm font-medium text-stone-500 animate-pulse">Menghubungkan ke Spreadsheet & memuat statistik asli...</p>
+      </div>
+
+      <div id="mainContent" class="hidden space-y-8">
+        
+        <!-- Alerts Banner -->
+        <div id="statusAlert" class="hidden p-4 rounded-2xl text-xs font-semibold duration-300"></div>
+
+        <!-- Dashboard Stats Grid -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          <!-- Cloud Info Card -->
+          <div class="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col justify-between hover:border-emerald-200 transition-all">
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Database Sumber</p>
+                <h3 class="text-base font-bold text-stone-900 leading-tight">Google Cloud Firestore</h3>
+              </div>
+              <span class="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+              </span>
+            </div>
+            <div class="mt-4 pt-3 border-t border-stone-100 flex flex-col gap-1 text-left">
+              <span class="text-[10px] font-bold text-stone-400 uppercase">PROJECT ID :</span>
+              <span id="projectIdText" class="font-mono text-xs text-stone-700 bg-stone-50 px-2 py-1 rounded border border-stone-200/50 break-all select-all">-</span>
+            </div>
+          </div>
+
+          <!-- Sync Trigger Card -->
+          <div class="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col justify-between hover:border-emerald-200 transition-all">
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Sistem Trigger</p>
+                <h3 class="text-base font-bold text-stone-900 leading-tight">Latar Belakang (Background Sync)</h3>
+              </div>
+              <span id="triggerStatusIcon" class="p-2 rounded-xl transition-all">
+                <!-- Will be inserted dynamically -->
+              </span>
+            </div>
+            <div class="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-left">
+              <span class="text-[10px] font-bold text-stone-400 uppercase">STATUS :</span>
+              <span id="triggerStatusBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full">-</span>
+            </div>
+          </div>
+
+          <!-- Total Data Card -->
+          <div class="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col justify-between hover:border-emerald-200 transition-all">
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Total Absensi</p>
+                <h1 id="totalRowsText" class="text-3xl font-extrabold text-stone-900 tracking-tight leading-none">-</h1>
+                <p class="text-xs text-stone-400 mt-1">Baris data dalam Absensi Sheet</p>
+              </div>
+              <span class="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              </span>
+            </div>
+            <div class="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-left">
+              <span class="text-[10px] font-bold text-stone-400 uppercase">SPREADSHEET LINK :</span>
+              <a id="sheetLinkButton" href="#" target="_blank" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 underline flex items-center gap-1">
+                Buka Sheets ↗
+              </a>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Command Panel -->
+        <section class="bg-white p-8 rounded-3xl border border-stone-200 shadow-sm">
+          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div class="text-left max-w-xl">
+              <h3 class="text-lg font-bold text-stone-900">Tarik Data Real-Time Firestore Manually</h3>
+              <p class="text-xs text-stone-400 mt-1 leading-relaxed">
+                Tombol di bawah ini akan memanggil API Google Cloud Firestore, mengambil seluruh transaksi absensi baru yang belum tercatat di lembar kerja ini, lalu menyisipkannya tanpa risiko duplikasi.
+              </p>
+            </div>
+            <div>
+              <button
+                id="btnSyncNow"
+                onclick="triggerManualSync()"
+                class="w-full md:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-sm font-bold border border-emerald-700/40 shadow-lg shadow-emerald-600/15 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+              >
+                <!-- Loading spin icon -->
+                <svg id="syncIconSpin" class="hidden animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span id="syncButtonText">Tarik & Sinkronkan Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Main Display: Recent Table -->
+        <section class="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden flex flex-col">
+          <div class="px-6 py-5 border-b border-stone-100 flex items-center justify-between bg-stone-50/50">
+            <div class="text-left">
+              <h3 class="font-bold text-stone-900 text-sm">Pratinjau Absensi Terkini di Google Sheet</h3>
+              <p class="text-[11px] text-stone-400 mt-0.5">Menampilkan maksimum 15 data baris paling bawah secara real-time</p>
+            </div>
+            
+            <button onclick="loadStats()" class="p-2 hover:bg-stone-150 text-stone-400 hover:text-stone-700 rounded-xl transition border border-transparent hover:border-stone-200">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 15H19" /></svg>
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-stone-50 text-stone-500 font-bold uppercase border-b border-stone-100">
+                  <th class="py-3 px-4 font-mono font-bold text-center w-12">No</th>
+                  <th class="py-3 px-4">Pegawai</th>
+                  <th class="py-3 px-4">Tanggal / Waktu</th>
+                  <th class="py-3 px-4">Tipe Absen</th>
+                  <th class="py-3 px-4">Metode</th>
+                  <th class="py-3 px-4">Status Keterlambatan</th>
+                  <th class="py-3 px-4">Pulang Cepat</th>
+                  <th class="py-3 px-4 font-mono text-[10px]">ID Dokumen (Metadata)</th>
+                </tr>
+              </thead>
+              <tbody id="attendanceTableBody">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div id="tableEmptyState" class="hidden py-12 text-center text-stone-400">
+            Tidak ada transaksi / spreadsheet "Absensi" kosong atau belum diisi.
+          </div>
+        </section>
+
+        <!-- Help Section -->
+        <section class="bg-zinc-800 text-stone-200 p-8 rounded-3xl border border-stone-700 shadow-lg text-left">
+          <h4 class="text-sm font-bold text-white mb-4">Panduan Sinkronisasi & Otorisasi Google Apps Script</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs leading-relaxed text-stone-300">
+            <div class="space-y-3">
+              <div class="flex gap-2.5">
+                <span class="w-5 h-5 rounded-full bg-emerald-600/30 text-emerald-400 flex items-center justify-center font-bold font-mono text-[11px] shrink-0">1</span>
+                <p><strong>Bagaimana trigger latar belakang bekerja?</strong> Saat sinkronisasi otomatis aktif, mesin internal Google akan menjalankan fungsi penarikan data secara berkala setiap 5 menit meskipun laptop/ browser Anda ditutup penuh.</p>
+              </div>
+              <div class="flex gap-2.5">
+                <span class="w-5 h-5 rounded-full bg-emerald-600/30 text-emerald-400 flex items-center justify-center font-bold font-mono text-[11px] shrink-0">2</span>
+                <p><strong>Mencegah Duplikasi:</strong> Google Apps Script membaca nilai tracker ID Firestore di kolom J sebelum menulis baris baru. Data yang sudah ada tidak akan diduplikasi sewaktu Anda menekan tombol "Sinkronkan".</p>
+              </div>
+            </div>
+            <div class="space-y-3">
+              <div class="flex gap-2.5">
+                <span class="w-5 h-5 rounded-full bg-emerald-600/30 text-emerald-400 flex items-center justify-center font-bold font-mono text-[11px] shrink-0">3</span>
+                <p><strong>Aktifkan Otomatis:</strong> Langsung lakukan lewat Google Spreadsheet di tab menu kustom paling atas <strong>Absensi Kesbangpoldagri</strong> &rarr; <strong>Aktifkan Sinkronisasi Otomatis (Setiap 5 Menit)</strong> untuk kemudahan operasional.</p>
+              </div>
+              <div class="flex gap-2.5">
+                <span class="w-5 h-5 rounded-full bg-emerald-600/30 text-emerald-400 flex items-center justify-center font-bold font-mono text-[11px] shrink-0">4</span>
+                <p><strong>Izin Akun Google:</strong> Pertama kali mengaktifkan trigger, Google akan meminta konfirmasi. Silakan klik "Lanjutkan" &rarr; "Buka project (tidak aman)" di sebelah kiri bawah dialog.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+    </div>
+
+    <script>
+      // Load data immediately on window load
+      window.onload = function() {
+        loadStats();
+      };
+
+      function loadStats() {
+        document.getElementById('loadingState').classList.remove('hidden');
+        document.getElementById('mainContent').classList.add('hidden');
+        
+        google.script.run
+          .withSuccessHandler(renderDashboard)
+          .withFailureHandler(handleLoadError)
+          .getDashboardData();
+      }
+
+      function renderDashboard(result) {
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('mainContent').classList.remove('hidden');
+        
+        // Render stats and items
+        document.getElementById('projectIdText').innerText = result.firebaseProjectId;
+        document.getElementById('totalRowsText').innerText = result.totalRows;
+        
+        const sheetBtn = document.getElementById('sheetLinkButton');
+        sheetBtn.href = result.spreadsheetUrl;
+        
+        // Show trigger details
+        const triggerIconBox = document.getElementById('triggerStatusIcon');
+        const triggerBadge = document.getElementById('triggerStatusBadge');
+        
+        if (result.triggerActive) {
+          triggerIconBox.className = 'p-2 bg-emerald-50 text-emerald-600 rounded-xl';
+          triggerIconBox.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+          
+          triggerBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
+          triggerBadge.innerText = 'Otomatis Aktif';
+        } else {
+          triggerIconBox.className = 'p-2 bg-amber-50 text-amber-600 rounded-xl';
+          triggerIconBox.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>';
+          
+          triggerBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700';
+          triggerBadge.innerText = 'Otomatis Nonaktif';
+        }
+
+        // Render table rows
+        const tableBody = document.getElementById('attendanceTableBody');
+        const emptyState = document.getElementById('tableEmptyState');
+        tableBody.innerHTML = '';
+        
+        if (!result.recentEntries || result.recentEntries.length === 0) {
+          emptyState.classList.remove('hidden');
+        } else {
+          emptyState.classList.add('hidden');
+          
+          result.recentEntries.forEach(item => {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-stone-100 hover:bg-stone-50/50 leading-normal';
+            
+            // Type design
+            const typeText = item.type === 'Hadir' ? 'Hadir' : 'Pulang';
+            const typeClass = item.type === 'Hadir' 
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+              : 'bg-blue-50 text-blue-700 border-blue-100';
+              
+            // Method design
+            const methodClass = item.method.includes('Mandiri') 
+              ? 'bg-purple-50 text-purple-700 border-purple-150' 
+              : 'bg-stone-100 text-stone-600 border-stone-200';
+              
+            // Late class
+            const lateClass = item.isLate === 'Terlambat' 
+              ? 'text-red-600 font-semibold' 
+              : 'text-stone-400';
+              
+            // Early leave
+            const earlyClass = item.isEarlyLeave.includes('Awal') 
+              ? 'text-amber-600 font-semibold' 
+              : 'text-stone-400';
+
+            row.innerHTML = `
+              <td class="py-3 px-4 font-mono font-medium text-center text-stone-400 border-r border-stone-100">${item.no}</td>
+              <td class="py-3 px-4">
+                <div class="font-semibold text-stone-930 text-xs">${item.employeeName}</div>
+                <div class="text-[10px] text-stone-400 mt-0.5">NIP: ${item.employeeId}</div>
+              </td>
+              <td class="py-3 px-4">
+                <div class="font-medium text-stone-700">${item.tanggal}</div>
+                <div class="text-[10px] font-mono font-medium text-stone-400 mt-0.5">${item.waktu}</div>
+              </td>
+              <td class="py-3 px-4 text-left">
+                <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold inline-block ${typeClass}">${typeText}</span>
+              </td>
+              <td class="py-3 px-4 text-left">
+                <span class="px-2 py-0.5 rounded-full border text-[10px] font-medium inline-block ${methodClass}">${item.method}</span>
+              </td>
+              <td class="py-3 px-4">
+                <span class="${lateClass}">${item.isLate}</span>
+              </td>
+              <td class="py-3 px-4">
+                <span class="${earlyClass}">${item.isEarlyLeave}</span>
+              </td>
+              <td class="py-3 px-4 font-mono text-[9px] text-stone-400 break-all select-all">${item.docId}</td>
+            `;
+            tableBody.appendChild(row);
+          });
+        }
+      }
+
+      function handleLoadError(error) {
+        document.getElementById('loadingState').classList.add('hidden');
+        showAlert("Gagal menghubungkan sistem Apps Script: " + error, "error");
+      }
+
+      function triggerManualSync() {
+        const btn = document.getElementById('btnSyncNow');
+        const btnText = document.getElementById('syncButtonText');
+        const spin = document.getElementById('syncIconSpin');
+        
+        btn.disabled = true;
+        spin.classList.remove('hidden');
+        btnText.innerText = "Sedang Menarik & Sinkron...";
+        
+        google.script.run
+          .withSuccessHandler(function(response) {
+            btn.disabled = false;
+            spin.classList.add('hidden');
+            btnText.innerText = "Tarik & Sinkronkan Sekarang";
+            
+            if (response.success) {
+              showAlert(response.message, "success");
+              renderDashboard(response.data);
+            } else {
+              showAlert("Pembacaan Firestore terputus: " + response.error, "error");
+            }
+          })
+          .withFailureHandler(function(error) {
+            btn.disabled = false;
+            spin.classList.add('hidden');
+            btnText.innerText = "Tarik & Sinkronkan Sekarang";
+            showAlert("Koneksi gagal: " + error, "error");
+          })
+          .runWebSync();
+      }
+
+      function showAlert(message, type) {
+        const banner = document.getElementById('statusAlert');
+        banner.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'border-emerald-100', 'bg-red-50', 'text-red-800', 'border-red-100');
+        
+        if (type === 'success') {
+          banner.className = "p-4 rounded-2xl text-xs font-semibold bg-emerald-55 bg-emerald-50 text-emerald-800 border border-emerald-150 inline-block w-full text-left";
+          banner.innerHTML = `<span class="font-bold">✔ Sukses:</span> ${message}`;
+        } else {
+          banner.className = "p-4 rounded-2xl text-xs font-semibold bg-red-55 bg-red-50 text-red-800 border border-red-150 inline-block w-full text-left";
+          banner.innerHTML = `<span class="font-bold">⚠ Gagal:</span> ${message}`;
+        }
+        
+        // Smooth scroll to top to see alert
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // Auto-dismiss after 6 seconds
+        setTimeout(() => {
+          banner.classList.add('hidden');
+        }, 6000);
+      }
+    </script>
+  </body>
+</html>

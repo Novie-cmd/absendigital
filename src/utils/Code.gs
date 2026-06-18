@@ -27,6 +27,95 @@ const FIREBASE_PROJECT_ID = "gen-lang-client-0137881932";
 const API_KEY = "AIzaSyBLzvNKQ0qLzu7XeWEr2SViCPVmHuLBVvo";
 
 /**
+ * Endpoint Utama Web App (serves Index.html)
+ */
+function doGet() {
+  return HtmlService.createTemplateFromFile('Index')
+    .evaluate()
+    .setTitle('Portal Absensi Kesbangpoldagri NTB - Sync')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Mengambil informasi ringkasan data dan absensi terbaru untuk ditampilkan di UI dashboard
+ */
+function getDashboardData() {
+  const sheetName = "Absensi";
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  
+  const result = {
+    spreadsheetId: ss.getId(),
+    spreadsheetName: ss.getName(),
+    spreadsheetUrl: ss.getUrl(),
+    firebaseProjectId: FIREBASE_PROJECT_ID,
+    totalRows: 0,
+    recentEntries: [],
+    triggerActive: false
+  };
+  
+  if (sheet) {
+    const lastRow = sheet.getLastRow();
+    result.totalRows = lastRow > 1 ? lastRow - 1 : 0;
+    
+    if (lastRow > 1) {
+      // Ambil maksimum 15 entri terbaru untuk dashboard
+      const startRow = Math.max(2, lastRow - 14);
+      const numRows = lastRow - startRow + 1;
+      const range = sheet.getRange(startRow, 1, numRows, 10);
+      const values = range.getValues();
+      
+      // Map baris data ke format JSON dan urutkan dari yang terbaru
+      result.recentEntries = values.map((row, index) => {
+        return {
+          no: row[0],
+          tanggal: row[1] ? (row[1] instanceof Date ? Utilities.formatDate(row[1], 'Asia/Makassar', 'yyyy-MM-dd') : row[1].toString()) : "",
+          waktu: row[2] ? (row[2] instanceof Date ? Utilities.formatDate(row[2], 'Asia/Makassar', 'HH:mm:ss') : row[2].toString()) : "",
+          employeeId: row[3] || "-",
+          employeeName: row[4] || "-",
+          type: row[5] || "-",
+          method: row[6] || "-",
+          isLate: row[7] || "-",
+          isEarlyLeave: row[8] || "-",
+          docId: row[9] || ""
+        };
+      }).reverse();
+    }
+  }
+  
+  // Periksa apakah trigger latar belakang aktif
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'syncFromFirestore') {
+      result.triggerActive = true;
+      break;
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Trigger sinkronisasi manual dari dashboard Web App
+ */
+function runWebSync() {
+  try {
+    syncFromFirestore();
+    return {
+      success: true,
+      message: "Sinkronisasi berhasil diselesaikan secara real-time dari Firestore!",
+      data: getDashboardData()
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.toString()
+    };
+  }
+}
+
+/**
  * Membuat menu kustom di Google Sheets setiap kali file spreadsheet dibuka.
  */
 function onOpen() {
