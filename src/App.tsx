@@ -624,13 +624,24 @@ export default function App() {
                 <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Pilih Dinas / SKPD Terdaftar</label>
                 <select
                   value={selectedDinasId}
-                  onChange={(e) => setSelectedDinasId(e.target.value)}
-                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '__ADD_NEW__') {
+                      setIsRegisteringDinas(true);
+                      setSelectedDinasId('');
+                    } else {
+                      setSelectedDinasId(value);
+                    }
+                  }}
+                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none font-medium text-stone-800"
                 >
                   <option value="">-- Pilih Dinas / SKPD --</option>
                   {dinases.map(d => (
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
+                  <option value="__ADD_NEW__" className="text-emerald-600 font-semibold bg-emerald-50">
+                    + Daftarkan Dinas / SKPD Baru...
+                  </option>
                 </select>
               </div>
 
