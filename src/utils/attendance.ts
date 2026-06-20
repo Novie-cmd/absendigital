@@ -100,49 +100,59 @@ export async function recordAttendance(
     // 1. Find employee by employeeId (filtered by dinasId if available for multi-SKPD support)
     const currentDinasId = settings?.dinasId || userProfile?.dinasId || 'kesbangpol';
     const currentDinasName = settings?.dinasName || userProfile?.dinasName || 'Kesbangpoldagri NTB';
-    const employeesRef = collection(db, 'employees');
-    let q = query(employeesRef, where('employeeId', '==', targetEmployeeId), where('dinasId', '==', currentDinasId));
     
-    let querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      // Fallback search without dinasId for backwards-compatibility
-      const qFallback = query(employeesRef, where('employeeId', '==', targetEmployeeId));
-      querySnapshot = await getDocs(qFallback);
-    }
-
     let employee = null;
-    if (!querySnapshot.empty) {
-      employee = querySnapshot.docs[0].data();
+    if (targetEmployeeId === 'ADMIN_TEMP') {
+      employee = {
+        name: userProfile?.employeeName || userProfile?.name || 'Administrator',
+        employeeId: 'ADMIN_TEMP',
+        dinasId: currentDinasId,
+        dinasName: currentDinasName
+      };
     } else {
-      // SMART FALLBACK: Match by normalized ID or substring to allow formatted inputs (dots, spaces, hyphens)
-      try {
-        const normalizedInput = targetEmployeeId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-        if (normalizedInput) {
-          const allSnap = await getDocs(collection(db, 'employees'));
-          const foundDoc = allSnap.docs.find(doc => {
-            const data = doc.data();
-            const empId = (data.employeeId || '').toString().trim();
-            const empIdNormalized = empId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const employeesRef = collection(db, 'employees');
+      let q = query(employeesRef, where('employeeId', '==', targetEmployeeId), where('dinasId', '==', currentDinasId));
+      
+      let querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        // Fallback search without dinasId for backwards-compatibility
+        const qFallback = query(employeesRef, where('employeeId', '==', targetEmployeeId));
+        querySnapshot = await getDocs(qFallback);
+      }
+
+      if (!querySnapshot.empty) {
+        employee = querySnapshot.docs[0].data();
+      } else {
+        // SMART FALLBACK: Match by normalized ID or substring to allow formatted inputs (dots, spaces, hyphens)
+        try {
+          const normalizedInput = targetEmployeeId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+          if (normalizedInput) {
+            const allSnap = await getDocs(collection(db, 'employees'));
+            const foundDoc = allSnap.docs.find(doc => {
+              const data = doc.data();
+              const empId = (data.employeeId || '').toString().trim();
+              const empIdNormalized = empId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+              
+              // Check exact normalized match
+              if (empIdNormalized === normalizedInput) return true;
+              
+              // Substring validation for IDs with length 4 or more to avoid false-positives
+              if (normalizedInput.length >= 4) {
+                return empIdNormalized.includes(normalizedInput) || normalizedInput.includes(empIdNormalized);
+              }
+              return false;
+            });
             
-            // Check exact normalized match
-            if (empIdNormalized === normalizedInput) return true;
-            
-            // Substring validation for IDs with length 4 or more to avoid false-positives
-            if (normalizedInput.length >= 4) {
-              return empIdNormalized.includes(normalizedInput) || normalizedInput.includes(empIdNormalized);
+            if (foundDoc) {
+              employee = foundDoc.data();
+              // Override with correct canonical ID so attendance record associates correctly
+              targetEmployeeId = employee.employeeId;
             }
-            return false;
-          });
-          
-          if (foundDoc) {
-            employee = foundDoc.data();
-            // Override with correct canonical ID so attendance record associates correctly
-            targetEmployeeId = employee.employeeId;
           }
+        } catch (err) {
+          console.error('Error during smart fallback employee search:', err);
         }
-      } catch (err) {
-        console.error('Error during smart fallback employee search:', err);
       }
     }
 
